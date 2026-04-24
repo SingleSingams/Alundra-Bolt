@@ -8,9 +8,15 @@ import {
   WORLD_WIDTH,
   WORLD_HEIGHT,
   GAME_EVENTS,
+  ATTACK_DURATION,
+  ATTACK_COOLDOWN,
+  ATTACK_ZONE_WIDTH,
+  ATTACK_ZONE_HEIGHT,
+  ATTACK_OFFSET,
 } from './constants';
 
 export type Direction = 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw' | 'idle';
+export type FacingDirection = Exclude<Direction, 'idle'>;
 
 interface InputKeys {
   up: Phaser.Input.Keyboard.Key;
@@ -23,22 +29,36 @@ interface InputKeys {
   leftA: Phaser.Input.Keyboard.Key;
   rightD: Phaser.Input.Keyboard.Key;
   spaceJump: Phaser.Input.Keyboard.Key;
+  attackX: Phaser.Input.Keyboard.Key;
 }
+
+const DIRECTION_ANGLES: Record<FacingDirection, number> = {
+  n: -90, ne: -45, e: 0, se: 45,
+  s: 90, sw: 135, w: 180, nw: -135,
+};
 
 export class Player extends Phaser.GameObjects.Container {
   private shadow: Phaser.GameObjects.Image;
   private sprite: Phaser.GameObjects.Image;
   private directionIndicator: Phaser.GameObjects.Graphics;
   private dustParticles: Phaser.GameObjects.Graphics;
+  private slashGfx: Phaser.GameObjects.Graphics;
+  private attackZone!: Phaser.GameObjects.Zone;
 
   private keys!: InputKeys;
   private isJumping = false;
   private jumpTween: Phaser.Tweens.Tween | null = null;
   private jumpOffset = 0;
   private facing: Direction = 'idle';
+  private lastDirection: FacingDirection = 's';
   private hp: number = MAX_HP;
   private invincibleTimer = 0;
   private stepBob = 0;
+
+  private isAttacking = false;
+  private attackCooldown = 0;
+  private attackTimer = 0;
+  private nearChest = false;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     super(scene, x, y);
@@ -47,8 +67,9 @@ export class Player extends Phaser.GameObjects.Container {
     this.sprite = scene.add.image(0, 0, 'player');
     this.directionIndicator = scene.add.graphics();
     this.dustParticles = scene.add.graphics();
+    this.slashGfx = scene.add.graphics();
 
-    this.add([this.shadow, this.dustParticles, this.sprite, this.directionIndicator]);
+    this.add([this.shadow, this.dustParticles, this.sprite, this.directionIndicator, this.slashGfx]);
 
     this.setupInput(scene);
     this.drawDirectionIndicator('s');
@@ -61,6 +82,13 @@ export class Player extends Phaser.GameObjects.Container {
     body.setOffset(-10, 4);
     body.setCollideWorldBounds(true);
     body.setBoundsRectangle(new Phaser.Geom.Rectangle(0, 0, WORLD_WIDTH, WORLD_HEIGHT));
+
+    this.attackZone = scene.add.zone(x, y, ATTACK_ZONE_WIDTH, ATTACK_ZONE_HEIGHT);
+    scene.physics.add.existing(this.attackZone);
+    const zoneBody = this.attackZone.body as Phaser.Physics.Arcade.Body;
+    zoneBody.setAllowGravity(false);
+    zoneBody.setImmovable(true);
+    zoneBody.enable = false;
   }
 
   private setupInput(scene: Phaser.Scene): void {
@@ -76,6 +104,7 @@ export class Player extends Phaser.GameObjects.Container {
       leftA: kb.addKey(Phaser.Input.Keyboard.KeyCodes.A),
       rightD: kb.addKey(Phaser.Input.Keyboard.KeyCodes.D),
       spaceJump: kb.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE),
+      attackX: kb.addKey(Phaser.Input.Keyboard.KeyCodes.X),
     };
   }
 
@@ -83,12 +112,7 @@ export class Player extends Phaser.GameObjects.Container {
     this.directionIndicator.clear();
     if (dir === 'idle') return;
 
-    const angles: Record<Direction, number> = {
-      n: -90, ne: -45, e: 0, se: 45,
-      s: 90, sw: 135, w: 180, nw: -135, idle: 0,
-    };
-
-    const angle = Phaser.Math.DegToRad(angles[dir]);
+    const angle = Phaser.Math.DegToRad(DIRECTION_ANGLES[dir]);
     const dist = 11;
     const tx = Math.cos(angle) * dist;
     const ty = Math.sin(angle) * dist;
@@ -104,9 +128,11 @@ export class Player extends Phaser.GameObjects.Container {
   update(delta: number): void {
     this.handleMovement();
     this.handleJump();
+    this.handleAttack(delta);
     this.updateSpritePosition();
     this.updateInvincibility(delta);
     this.updateBob(delta);
+    this.updateAttackZonePosition();
   }
 
   private handleMovement(): void {
@@ -140,6 +166,7 @@ export class Player extends Phaser.GameObjects.Container {
       else if (goLeft) this.facing = 'w';
       else if (goRight) this.facing = 'e';
 
+      this.lastDirection = this.facing as FacingDirection;
       this.drawDirectionIndicator(this.facing);
     } else {
       this.facing = 'idle';
@@ -150,9 +177,96 @@ export class Player extends Phaser.GameObjects.Container {
 
   private handleJump(): void {
     const { jumpZ, spaceJump } = this.keys;
-    if ((Phaser.Input.Keyboard.JustDown(jumpZ) || Phaser.Input.Keyboard.JustDown(spaceJump)) && !this.isJumping) {
+    const jumpPressed =
+      Phaser.Input.Keyboard.JustDown(jumpZ) || Phaser.Input.Keyboard.JustDown(spaceJump);
+
+    if (jumpPressed && !this.isJumping && !this.nearChest) {
       this.startJump();
     }
+  }
+
+  private handleAttack(delta: number): void {
+    if (this.attackCooldown > 0) {
+      this.attackCooldown = Math.max(0, this.attackCooldown - delta);
+    }
+    if (this.isAttacking) {
+      this.attackTimer -= delta;
+      if (this.attackTimer <= 0) {
+        this.endAttack();
+      }
+    }
+
+    const { attackX } = this.keys;
+    if (Phaser.Input.Keyboard.JustDown(attackX) && !this.isAttacking && this.attackCooldown <= 0) {
+      this.startAttack();
+    }
+  }
+
+  private startAttack(): void {
+    this.isAttacking = true;
+    this.attackTimer = ATTACK_DURATION;
+    this.attackCooldown = ATTACK_COOLDOWN;
+
+    const body = this.attackZone.body as Phaser.Physics.Arcade.Body;
+    body.enable = true;
+    this.updateAttackZonePosition();
+    this.drawSlashEffect();
+
+    this.scene.tweens.killTweensOf(this.sprite);
+    this.scene.tweens.add({
+      targets: this.sprite,
+      scaleX: 1.5,
+      scaleY: 0.85,
+      duration: 80,
+      yoyo: true,
+      ease: 'Sine.easeOut',
+      onComplete: () => {
+        this.sprite.setScale(1);
+      },
+    });
+
+    this.scene.game.events.emit(GAME_EVENTS.PLAYER_ATTACK, this.lastDirection);
+  }
+
+  private endAttack(): void {
+    this.isAttacking = false;
+    const body = this.attackZone.body as Phaser.Physics.Arcade.Body;
+    body.enable = false;
+    this.slashGfx.clear();
+    this.sprite.setScale(1);
+  }
+
+  private updateAttackZonePosition(): void {
+    if (!this.isAttacking) return;
+    const angle = Phaser.Math.DegToRad(DIRECTION_ANGLES[this.lastDirection]);
+    const ox = Math.cos(angle) * ATTACK_OFFSET;
+    const oy = Math.sin(angle) * ATTACK_OFFSET;
+    this.attackZone.setPosition(this.x + ox, this.y + oy);
+  }
+
+  private drawSlashEffect(): void {
+    this.slashGfx.clear();
+    const angle = Phaser.Math.DegToRad(DIRECTION_ANGLES[this.lastDirection]);
+    const cx = Math.cos(angle) * ATTACK_OFFSET;
+    const cy = Math.sin(angle) * ATTACK_OFFSET;
+
+    this.slashGfx.lineStyle(3, 0xfef9c3, 0.9);
+    this.slashGfx.beginPath();
+    this.slashGfx.arc(cx, cy, 12, angle - Math.PI * 0.4, angle + Math.PI * 0.4, false);
+    this.slashGfx.strokePath();
+
+    this.slashGfx.fillStyle(0xfef9c3, 0.35);
+    this.slashGfx.fillCircle(cx, cy, 10);
+
+    this.scene.tweens.add({
+      targets: this.slashGfx,
+      alpha: 0,
+      duration: ATTACK_DURATION,
+      onComplete: () => {
+        this.slashGfx.clear();
+        this.slashGfx.setAlpha(1);
+      },
+    });
   }
 
   private startJump(): void {
@@ -214,7 +328,7 @@ export class Player extends Phaser.GameObjects.Container {
     const body = this.body as Phaser.Physics.Arcade.Body;
     const moving = body.velocity.x !== 0 || body.velocity.y !== 0;
 
-    if (moving && !this.isJumping) {
+    if (moving && !this.isJumping && !this.isAttacking) {
       this.stepBob += delta * 0.009;
       this.sprite.y = this.jumpOffset + Math.sin(this.stepBob * Math.PI) * 1.5;
       this.directionIndicator.y = this.sprite.y;
@@ -253,5 +367,24 @@ export class Player extends Phaser.GameObjects.Container {
 
   getFacing(): Direction {
     return this.facing;
+  }
+
+  getLastDirection(): FacingDirection {
+    return this.lastDirection;
+  }
+
+  getAttackZone(): Phaser.GameObjects.Zone {
+    return this.attackZone;
+  }
+
+  setNearChest(value: boolean): void {
+    this.nearChest = value;
+  }
+
+  wantsInteract(): boolean {
+    return (
+      Phaser.Input.Keyboard.JustDown(this.keys.jumpZ) ||
+      Phaser.Input.Keyboard.JustDown(this.keys.spaceJump)
+    );
   }
 }

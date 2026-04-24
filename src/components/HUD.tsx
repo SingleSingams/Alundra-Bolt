@@ -1,4 +1,5 @@
 import { cn } from '../lib/utils';
+import { InventoryItem, MAX_INVENTORY } from '../game/constants';
 
 interface HeartProps {
   filled: boolean;
@@ -11,7 +12,6 @@ function Heart({ filled, half, index }: HeartProps) {
     <div
       className="relative"
       style={{
-        animation: filled ? undefined : undefined,
         transitionDelay: `${index * 40}ms`,
       }}
     >
@@ -81,13 +81,145 @@ function ControlBadge({ keys, label }: ControlBadgeProps) {
   );
 }
 
+function HeartIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" className="drop-shadow">
+      <defs>
+        <linearGradient id="inv-heart" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#f87171" />
+          <stop offset="100%" stopColor="#b91c1c" />
+        </linearGradient>
+      </defs>
+      <path
+        d="M12 21 C12 21 3 14 3 8 C3 5.2 5.2 3 8 3 C9.7 3 11.2 3.9 12 5.2 C12.8 3.9 14.3 3 16 3 C18.8 3 21 5.2 21 8 C21 14 12 21 12 21Z"
+        fill="url(#inv-heart)"
+        stroke="#7f1d1d"
+        strokeWidth="1.2"
+        strokeLinejoin="round"
+      />
+      <ellipse
+        cx="8.5"
+        cy="7.5"
+        rx="1.8"
+        ry="1"
+        fill="rgba(255,255,255,0.45)"
+        transform="rotate(-20, 8.5, 7.5)"
+      />
+    </svg>
+  );
+}
+
+function SwordIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" className="drop-shadow">
+      <defs>
+        <linearGradient id="inv-blade" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#e5e7eb" />
+          <stop offset="50%" stopColor="#9ca3af" />
+          <stop offset="100%" stopColor="#6b7280" />
+        </linearGradient>
+      </defs>
+      {/* Blade */}
+      <polygon
+        points="17,3 21,3 21,7 8,20 5,20 5,17"
+        fill="url(#inv-blade)"
+        stroke="#4b5563"
+        strokeWidth="0.8"
+        strokeLinejoin="round"
+      />
+      {/* Cross guard */}
+      <rect
+        x="3.5"
+        y="15"
+        width="6"
+        height="2"
+        transform="rotate(-45, 6.5, 16)"
+        fill="#78350f"
+        stroke="#451a03"
+        strokeWidth="0.6"
+      />
+      {/* Grip */}
+      <rect
+        x="2"
+        y="19"
+        width="4"
+        height="2"
+        transform="rotate(-45, 4, 20)"
+        fill="#1e293b"
+        stroke="#0f172a"
+        strokeWidth="0.6"
+      />
+      {/* Pommel */}
+      <circle cx="3" cy="21" r="1.3" fill="#eab308" stroke="#854d0e" strokeWidth="0.5" />
+    </svg>
+  );
+}
+
+interface InventorySlotProps {
+  item?: InventoryItem;
+  index: number;
+}
+
+function InventorySlot({ item, index }: InventorySlotProps) {
+  const hasItem = !!item;
+  return (
+    <div
+      className={cn(
+        'relative w-9 h-9 rounded-md border flex items-center justify-center transition-all duration-200',
+        hasItem
+          ? 'bg-stone-800/80 border-amber-600/60 shadow-[0_0_8px_rgba(217,119,6,0.25)]'
+          : 'bg-stone-900/60 border-stone-700/50 border-dashed'
+      )}
+      style={{ transitionDelay: `${index * 30}ms` }}
+    >
+      {hasItem ? (
+        <div className="animate-in fade-in zoom-in duration-200">
+          {item === 'heart' ? <HeartIcon /> : <SwordIcon />}
+        </div>
+      ) : (
+        <span className="text-[9px] text-stone-600 font-mono font-bold">{index + 1}</span>
+      )}
+    </div>
+  );
+}
+
+interface InventoryBarProps {
+  inventory: InventoryItem[];
+}
+
+function InventoryBar({ inventory }: InventoryBarProps) {
+  const slots: (InventoryItem | undefined)[] = [];
+  for (let i = 0; i < MAX_INVENTORY; i++) {
+    slots.push(inventory[i]);
+  }
+
+  return (
+    <div className="absolute top-4 right-4 pointer-events-none select-none">
+      <div className="bg-stone-900/75 backdrop-blur-sm border border-stone-700/60 rounded-xl px-3 py-2.5 shadow-xl">
+        <div className="flex items-center gap-1 mb-1.5">
+          <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+          <span className="text-[10px] font-bold tracking-widest text-stone-400 uppercase">
+            Inventory
+          </span>
+        </div>
+        <div className="flex gap-1.5">
+          {slots.map((item, i) => (
+            <InventorySlot key={i} item={item} index={i} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface HUDProps {
   hp: number;
   maxHp: number;
   isJumping: boolean;
+  inventory: InventoryItem[];
 }
 
-export function HUD({ hp, maxHp, isJumping }: HUDProps) {
+export function HUD({ hp, maxHp, isJumping, inventory }: HUDProps) {
   const fullHearts = Math.floor(hp / 2);
   const hasHalf = hp % 2 === 1;
   const totalSlots = Math.ceil(maxHp / 2);
@@ -122,6 +254,8 @@ export function HUD({ hp, maxHp, isJumping }: HUDProps) {
         </div>
       </div>
 
+      <InventoryBar inventory={inventory} />
+
       {isJumping && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 pointer-events-none select-none">
           <div className="bg-sky-900/70 backdrop-blur-sm border border-sky-600/50 rounded-full px-4 py-1 shadow-lg animate-bounce">
@@ -138,7 +272,8 @@ export function HUD({ hp, maxHp, isJumping }: HUDProps) {
             Controls
           </div>
           <ControlBadge keys={['W', 'A', 'S', 'D']} label="Move" />
-          <ControlBadge keys={['Z', 'Spc']} label="Jump" />
+          <ControlBadge keys={['Z', 'Spc']} label="Jump / Open" />
+          <ControlBadge keys={['X']} label="Attack" />
         </div>
       </div>
     </>

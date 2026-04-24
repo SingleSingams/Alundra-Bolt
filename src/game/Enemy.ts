@@ -1,6 +1,6 @@
 import * as Phaser from 'phaser';
 import { Player } from './Player';
-import { TILE_SIZE } from './constants';
+import { TILE_SIZE, ENEMY_MAX_HP, ENEMY_HIT_INVULN_MS, ENEMY_FLASH_MS } from './constants';
 
 const CHASE_RANGE = 150;
 const LEASH_RANGE = 250;
@@ -21,6 +21,9 @@ export class Enemy extends Phaser.GameObjects.Container {
   private readonly patrolAxis: PatrolAxis;
   private patrolDir = 1;
   private alertVisible = false;
+  private hp: number = ENEMY_MAX_HP;
+  private hitInvulnTimer = 0;
+  private dying = false;
 
   constructor(scene: Phaser.Scene, x: number, y: number, patrolAxis: PatrolAxis = 'x') {
     super(scene, x, y);
@@ -78,7 +81,12 @@ export class Enemy extends Phaser.GameObjects.Container {
     gfx.destroy();
   }
 
-  update(player: Player): void {
+  update(player: Player, delta: number = 16): void {
+    if (this.dying) return;
+    if (this.hitInvulnTimer > 0) {
+      this.hitInvulnTimer = Math.max(0, this.hitInvulnTimer - delta);
+    }
+
     const dist = Phaser.Math.Distance.Between(this.x, this.y, player.x, player.y);
     const body = this.body as Phaser.Physics.Arcade.Body;
 
@@ -165,5 +173,62 @@ export class Enemy extends Phaser.GameObjects.Container {
 
   getState(): EnemyState {
     return this.aiState;
+  }
+
+  canBeHit(): boolean {
+    return !this.dying && this.hitInvulnTimer <= 0;
+  }
+
+  isDying(): boolean {
+    return this.dying;
+  }
+
+  takeDamage(amount: number, onDeath: (x: number, y: number) => void): boolean {
+    if (!this.canBeHit()) return false;
+    this.hp = Math.max(0, this.hp - amount);
+    this.hitInvulnTimer = ENEMY_HIT_INVULN_MS;
+
+    // White hit flash for ~3 frames (fill-tint replaces all sprite colors)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (this.sprite as any).setTintFill?.(0xffffff);
+    if (!(this.sprite as unknown as { tintFill: boolean }).tintFill) {
+      this.sprite.setTint(0xffffff);
+    }
+    this.scene.time.delayedCall(ENEMY_FLASH_MS, () => {
+      if (this.dying) return;
+      this.sprite.clearTint();
+      if (this.aiState === 'CHASE') {
+        this.sprite.setTint(0xff6060);
+      }
+    });
+
+    // Knockback away from attacker not required; keep simple
+    if (this.hp <= 0) {
+      this.die(onDeath);
+    }
+    return true;
+  }
+
+  private die(onDeath: (x: number, y: number) => void): void {
+    this.dying = true;
+    const body = this.body as Phaser.Physics.Arcade.Body;
+    body.enable = false;
+    this.hideAlert();
+
+    const deathX = this.x;
+    const deathY = this.y;
+
+    this.scene.tweens.add({
+      targets: this,
+      alpha: 0,
+      scaleX: 0.4,
+      scaleY: 0.4,
+      duration: 320,
+      ease: 'Sine.easeIn',
+      onComplete: () => {
+        onDeath(deathX, deathY);
+        this.destroy();
+      },
+    });
   }
 }

@@ -8,6 +8,7 @@ export const JUMP_HEIGHT = 44;
 export const JUMP_SCALE_PEAK = 1.18;
 
 export const MAX_HP = 6;
+export const HEART_HEAL_AMOUNT = 2;
 
 export const CAMERA_LERP = 0.08;
 
@@ -16,8 +17,28 @@ export const TILE_VARIANTS = 5;
 export const WORLD_WIDTH = MAP_WIDTH * TILE_SIZE;
 export const WORLD_HEIGHT = MAP_HEIGHT * TILE_SIZE;
 
+export const ATTACK_DURATION = 200;
+export const ATTACK_COOLDOWN = 600;
+export const ATTACK_ZONE_WIDTH = 34;
+export const ATTACK_ZONE_HEIGHT = 26;
+export const ATTACK_OFFSET = 18;
+export const ATTACK_DAMAGE = 2;
+
+export const ENEMY_MAX_HP = 4;
+export const ENEMY_HIT_INVULN_MS = 240;
+export const ENEMY_FLASH_MS = 55;
+export const CHEST_DROP_CHANCE = 0.5;
+
+export const MAX_INVENTORY = 3;
+export const CHEST_INTERACT_RADIUS = 44;
+
 export const GAME_EVENTS = {
   HP_CHANGE: 'hp-change',
   PLAYER_JUMP: 'player-jump',
   PLAYER_LAND: 'player-land',
+  PLAYER_ATTACK: 'player-attack',
+  INVENTORY_CHANGE: 'inventory-change',
+  CHEST_PROXIMITY: 'chest-proximity',
 } as const;
+
+export type InventoryItem = 'heart' | 'sword_upgrade';

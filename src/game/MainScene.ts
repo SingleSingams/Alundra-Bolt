@@ -1,6 +1,7 @@
 import * as Phaser from 'phaser';
 import { Player } from './Player';
 import { Enemy, PatrolAxis } from './Enemy';
+import { Item, WorldItemType } from './Item';
 import {
   createGrassTileset,
   createPlayerTexture,
@@ -15,6 +16,13 @@ import {
   WORLD_WIDTH,
   WORLD_HEIGHT,
   CAMERA_LERP,
+  GAME_EVENTS,
+  ATTACK_DAMAGE,
+  CHEST_DROP_CHANCE,
+  CHEST_INTERACT_RADIUS,
+  HEART_HEAL_AMOUNT,
+  MAX_INVENTORY,
+  InventoryItem,
 } from './constants';
 
 const TREE_POSITIONS: Array<{ x: number; y: number }> = [];
@@ -30,13 +38,23 @@ const ENEMY_SPAWNS: Array<{ tx: number; ty: number; axis: PatrolAxis }> = [
   { tx: 30, ty: 10, axis: 'x' },
 ];
 
+const INITIAL_HEART_SPAWNS: Array<{ tx: number; ty: number }> = [
+  { tx: 22, ty: 32 },
+  { tx: 38, ty: 28 },
+  { tx: 30, ty: 40 },
+];
+
 export class MainScene extends Phaser.Scene {
   private player!: Player;
   private enemies: Enemy[] = [];
+  private items: Item[] = [];
   private treeGroup!: Phaser.GameObjects.Group;
   private groundLayer!: Phaser.Tilemaps.TilemapLayer;
   private obstacles!: Phaser.Physics.Arcade.StaticGroup;
   private treeObstacles!: Phaser.Physics.Arcade.StaticGroup;
+
+  private inventory: InventoryItem[] = [];
+  private activeChest: Item | null = null;
 
   constructor() {
     super({ key: 'MainScene' });
@@ -54,16 +72,21 @@ export class MainScene extends Phaser.Scene {
 
     this.buildTilemap();
     this.createObstacleTextures();
+    Item.ensureTextures(this);
     this.placeTrees();
     this.placeObstacles();
 
     this.player = new Player(this, WORLD_WIDTH / 2, WORLD_HEIGHT / 2);
     this.spawnEnemies();
+    this.spawnInitialItems();
     this.setupColliders();
 
     this.sortTrees();
     this.setupCamera();
     this.setupDepth();
+
+    this.inventory = [];
+    this.emitInventoryChange();
   }
 
   // ─── Tilemap ──────────────────────────────────────────────────────────────
@@ -100,15 +123,12 @@ export class MainScene extends Phaser.Scene {
       const gfx = this.add.graphics();
       const s = 28;
 
-      // Rock base
       gfx.fillStyle(0x78716c, 1);
       gfx.fillEllipse(s / 2, s / 2 + 2, s - 2, s - 8);
 
-      // Highlight
       gfx.fillStyle(0xa8a29e, 1);
       gfx.fillEllipse(s / 2 - 3, s / 2 - 2, s - 10, s - 16);
 
-      // Crack detail
       gfx.lineStyle(1, 0x57534e, 0.8);
       gfx.strokeLineShape(new Phaser.Geom.Line(10, 14, 16, 20));
       gfx.strokeLineShape(new Phaser.Geom.Line(16, 20, 20, 16));
@@ -193,7 +213,6 @@ export class MainScene extends Phaser.Scene {
     const centerTX = Math.floor(MAP_WIDTH / 2);
     const centerTY = Math.floor(MAP_HEIGHT / 2);
 
-    // Build a set of tile coords occupied by trees (plus 1-tile padding)
     const treeTiles = new Set<string>();
     for (const pos of TREE_POSITIONS) {
       const tx = Math.floor(pos.x / TILE_SIZE);
@@ -205,11 +224,16 @@ export class MainScene extends Phaser.Scene {
       }
     }
 
-    // Also keep enemy spawn tiles clear
     const enemyTiles = new Set<string>(
       ENEMY_SPAWNS.flatMap(({ tx, ty }) => [
         `${tx},${ty}`, `${tx - 1},${ty}`, `${tx + 1},${ty}`,
         `${tx},${ty - 1}`, `${tx},${ty + 1}`,
+      ])
+    );
+
+    const heartTiles = new Set<string>(
+      INITIAL_HEART_SPAWNS.flatMap(({ tx, ty }) => [
+        `${tx},${ty}`, `${tx - 1},${ty}`, `${tx + 1},${ty}`,
       ])
     );
 
@@ -222,6 +246,7 @@ export class MainScene extends Phaser.Scene {
         if (dFromSpawn < SPAWN_SAFE_TILES) continue;
         if (treeTiles.has(`${tx},${ty}`)) continue;
         if (enemyTiles.has(`${tx},${ty}`)) continue;
+        if (heartTiles.has(`${tx},${ty}`)) continue;
         if (Math.random() > OBSTACLE_DENSITY) continue;
 
         const px = tx * TILE_SIZE + TILE_SIZE / 2;
@@ -233,7 +258,6 @@ export class MainScene extends Phaser.Scene {
       }
     }
 
-    // Invisible trunk colliders for each tree
     for (const pos of TREE_POSITIONS) {
       const blocker = this.treeObstacles.create(
         pos.x, pos.y + 4, 'blocker'
@@ -254,14 +278,33 @@ export class MainScene extends Phaser.Scene {
     }
   }
 
+  // ─── Items ────────────────────────────────────────────────────────────────
+
+  private spawnInitialItems(): void {
+    this.items = [];
+    for (const spawn of INITIAL_HEART_SPAWNS) {
+      const px = spawn.tx * TILE_SIZE + TILE_SIZE / 2;
+      const py = spawn.ty * TILE_SIZE + TILE_SIZE / 2;
+      this.spawnWorldItem(px, py, 'heart_pickup');
+    }
+  }
+
+  private spawnWorldItem(x: number, y: number, type: WorldItemType): Item {
+    const item = new Item(this, x, y, type);
+    this.items.push(item);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    this.physics.add.collider(item as any, this.obstacles);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    this.physics.add.collider(item as any, this.treeObstacles);
+    return item;
+  }
+
   // ─── Physics setup ────────────────────────────────────────────────────────
 
   private setupColliders(): void {
-    // Player ↔ solid obstacles
     this.physics.add.collider(this.player, this.obstacles);
     this.physics.add.collider(this.player, this.treeObstacles);
 
-    // Enemies ↔ solid obstacles (so they don't walk through rocks/trees)
     for (const enemy of this.enemies) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       this.physics.add.collider(enemy as any, this.obstacles);
@@ -269,17 +312,110 @@ export class MainScene extends Phaser.Scene {
       this.physics.add.collider(enemy as any, this.treeObstacles);
     }
 
-    // Player ↔ enemies → deal damage
+    // Player body ↔ enemies → deal damage
     this.physics.add.overlap(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       this.player as any,
-      this.enemies as any[],
-      () => {
+      this.enemies as unknown as Phaser.GameObjects.GameObject[],
+      (_p, enemyObj) => {
+        const enemy = enemyObj as Enemy;
+        if (enemy.isDying()) return;
         this.player.takeDamage(2);
       },
       undefined,
       this
     );
+
+    // Attack zone ↔ enemies → apply damage to enemies
+    this.physics.add.overlap(
+      this.player.getAttackZone(),
+      this.enemies as unknown as Phaser.GameObjects.GameObject[],
+      (_zone, enemyObj) => {
+        const enemy = enemyObj as Enemy;
+        if (!enemy.canBeHit()) return;
+        enemy.takeDamage(ATTACK_DAMAGE, (ex, ey) => this.onEnemyDeath(ex, ey));
+      },
+      undefined,
+      this
+    );
+  }
+
+  private onEnemyDeath(x: number, y: number): void {
+    this.enemies = this.enemies.filter((e) => !e.isDying() && e.active);
+    if (Math.random() < CHEST_DROP_CHANCE) {
+      this.spawnWorldItem(x, y, 'chest');
+    }
+  }
+
+  // ─── Inventory ────────────────────────────────────────────────────────────
+
+  private addToInventory(item: InventoryItem): void {
+    this.inventory = [...this.inventory, item];
+    if (this.inventory.length > MAX_INVENTORY) {
+      this.inventory = this.inventory.slice(this.inventory.length - MAX_INVENTORY);
+    }
+    this.emitInventoryChange();
+  }
+
+  private emitInventoryChange(): void {
+    this.game.events.emit(GAME_EVENTS.INVENTORY_CHANGE, [...this.inventory]);
+  }
+
+  // ─── Chest / pickup interaction ───────────────────────────────────────────
+
+  private updateItemInteractions(): void {
+    // Clean up destroyed items first
+    this.items = this.items.filter((item) => item.active);
+
+    let nearestChest: Item | null = null;
+    let nearestDist = CHEST_INTERACT_RADIUS;
+
+    for (const item of this.items) {
+      const dist = Phaser.Math.Distance.Between(item.x, item.y, this.player.x, this.player.y);
+
+      if (item.itemType === 'heart_pickup' && !item.isOpened() && dist < 22) {
+        item.collect(() => {
+          this.player.heal(HEART_HEAL_AMOUNT);
+          this.addToInventory('heart');
+        });
+        continue;
+      }
+
+      if (item.itemType === 'chest' && !item.isOpened()) {
+        if (dist < nearestDist) {
+          nearestDist = dist;
+          nearestChest = item;
+        }
+      }
+    }
+
+    // Update chest prompt state
+    if (nearestChest !== this.activeChest) {
+      this.activeChest?.showInteractPrompt(false);
+      this.activeChest = nearestChest;
+    }
+
+    if (this.activeChest) {
+      this.activeChest.showInteractPrompt(true);
+      this.player.setNearChest(true);
+
+      if (this.player.wantsInteract()) {
+        const reward = this.activeChest.openChest();
+        if (reward) {
+          this.applyChestReward(reward);
+        }
+        this.activeChest = null;
+      }
+    } else {
+      this.player.setNearChest(false);
+    }
+  }
+
+  private applyChestReward(reward: InventoryItem): void {
+    if (reward === 'heart') {
+      this.player.heal(HEART_HEAL_AMOUNT);
+    }
+    this.addToInventory(reward);
   }
 
   // ─── Camera & depth ───────────────────────────────────────────────────────
@@ -311,7 +447,13 @@ export class MainScene extends Phaser.Scene {
     this.player.setDepth(this.player.y + 1);
 
     for (const enemy of this.enemies) {
-      enemy.update(this.player);
+      if (enemy.active) enemy.update(this.player, delta);
     }
+
+    for (const item of this.items) {
+      if (item.active) item.update(delta);
+    }
+
+    this.updateItemInteractions();
   }
 }
