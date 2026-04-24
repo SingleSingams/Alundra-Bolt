@@ -1,5 +1,12 @@
 import { cn } from '../lib/utils';
-import { InventoryItem, MAX_INVENTORY } from '../game/constants';
+import {
+  InventoryItem,
+  MAX_INVENTORY,
+  ZoneId,
+  ZONES,
+  ZONE_ORDER,
+} from '../game/constants';
+import { MapPin } from 'lucide-react';
 
 interface HeartProps {
   filled: boolean;
@@ -212,14 +219,76 @@ function InventoryBar({ inventory }: InventoryBarProps) {
   );
 }
 
+interface MinimapProps {
+  zone: ZoneId;
+}
+
+function Minimap({ zone }: MinimapProps) {
+  const zoneMeta = ZONES[zone];
+  const currentIndex = ZONE_ORDER.indexOf(zone);
+
+  return (
+    <div className="absolute bottom-4 left-4 pointer-events-none select-none">
+      <div className="bg-stone-900/75 backdrop-blur-sm border border-stone-700/60 rounded-xl px-3 py-2.5 shadow-xl min-w-[168px]">
+        <div className="flex items-center gap-1.5 mb-2">
+          <MapPin className="w-3 h-3 text-emerald-400" />
+          <span className="text-[10px] font-bold tracking-widest text-stone-400 uppercase">
+            Region
+          </span>
+        </div>
+        <div
+          key={zone}
+          className="text-amber-100 font-semibold text-sm leading-tight mb-2.5 animate-in fade-in slide-in-from-left-1 duration-300"
+        >
+          {zoneMeta.name}
+        </div>
+        <div className="flex items-center gap-1.5">
+          {ZONE_ORDER.map((z, i) => {
+            const active = z === zone;
+            const visited = i <= currentIndex;
+            return (
+              <div key={z} className="flex items-center gap-1.5">
+                <div className="relative">
+                  <div
+                    className={cn(
+                      'w-2.5 h-2.5 rounded-full transition-all duration-300',
+                      active
+                        ? 'bg-amber-400 scale-125 shadow-[0_0_8px_rgba(251,191,36,0.7)]'
+                        : visited
+                        ? 'bg-amber-700/70'
+                        : 'bg-stone-600/70'
+                    )}
+                  />
+                  {active && (
+                    <div className="absolute inset-0 rounded-full bg-amber-400/40 animate-ping" />
+                  )}
+                </div>
+                {i < ZONE_ORDER.length - 1 && (
+                  <div
+                    className={cn(
+                      'h-px w-6 transition-colors duration-300',
+                      i < currentIndex ? 'bg-amber-700/60' : 'bg-stone-700/60'
+                    )}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface HUDProps {
   hp: number;
   maxHp: number;
   isJumping: boolean;
   inventory: InventoryItem[];
+  zone: ZoneId;
 }
 
-export function HUD({ hp, maxHp, isJumping, inventory }: HUDProps) {
+export function HUD({ hp, maxHp, isJumping, inventory, zone }: HUDProps) {
   const fullHearts = Math.floor(hp / 2);
   const hasHalf = hp % 2 === 1;
   const totalSlots = Math.ceil(maxHp / 2);
@@ -255,6 +324,8 @@ export function HUD({ hp, maxHp, isJumping, inventory }: HUDProps) {
       </div>
 
       <InventoryBar inventory={inventory} />
+
+      <Minimap zone={zone} />
 
       {isJumping && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 pointer-events-none select-none">

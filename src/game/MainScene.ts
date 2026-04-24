@@ -2,6 +2,7 @@ import * as Phaser from 'phaser';
 import { Player } from './Player';
 import { Enemy, PatrolAxis } from './Enemy';
 import { Item, WorldItemType } from './Item';
+import { NPC, NPCDefinition } from './NPC';
 import {
   createGrassTileset,
   createPlayerTexture,
@@ -23,31 +24,114 @@ import {
   HEART_HEAL_AMOUNT,
   MAX_INVENTORY,
   InventoryItem,
+  ZoneId,
+  ZONES,
+  TRANSITION_FADE_MS,
+  TRANSITION_EDGE_TILES,
+  DialogPayload,
 } from './constants';
 
 const TREE_POSITIONS: Array<{ x: number; y: number }> = [];
-const NUM_TREES = 40;
-const OBSTACLE_DENSITY = 0.13;
 const SPAWN_SAFE_TILES = 6;
+const NPC_INTERACT_RADIUS = 42;
+const TRANSITION_ZONE_THICKNESS = TRANSITION_EDGE_TILES * TILE_SIZE;
 
-const ENEMY_SPAWNS: Array<{ tx: number; ty: number; axis: PatrolAxis }> = [
-  { tx: 14, ty: 14, axis: 'x' },
-  { tx: 46, ty: 14, axis: 'y' },
-  { tx: 14, ty: 46, axis: 'y' },
-  { tx: 46, ty: 46, axis: 'x' },
-  { tx: 30, ty: 10, axis: 'x' },
-];
+type EdgeDirection = 'east' | 'west';
 
-const INITIAL_HEART_SPAWNS: Array<{ tx: number; ty: number }> = [
-  { tx: 22, ty: 32 },
-  { tx: 38, ty: 28 },
-  { tx: 30, ty: 40 },
-];
+interface ZoneConfig {
+  numTrees: number;
+  obstacleDensity: number;
+  enemySpawns: Array<{ tx: number; ty: number; axis: PatrolAxis }>;
+  heartSpawns: Array<{ tx: number; ty: number }>;
+  npcs: NPCDefinition[];
+  transitions: Partial<Record<EdgeDirection, ZoneId>>;
+}
+
+const centerX = WORLD_WIDTH / 2;
+const centerY = WORLD_HEIGHT / 2;
+
+const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
+  grasslands: {
+    numTrees: 40,
+    obstacleDensity: 0.1,
+    enemySpawns: [
+      { tx: 14, ty: 14, axis: 'x' },
+      { tx: 46, ty: 14, axis: 'y' },
+      { tx: 14, ty: 46, axis: 'y' },
+      { tx: 46, ty: 46, axis: 'x' },
+    ],
+    heartSpawns: [
+      { tx: 22, ty: 40 },
+      { tx: 38, ty: 40 },
+    ],
+    npcs: [
+      {
+        id: 'elara',
+        name: 'Elara the Herbalist',
+        x: centerX - 110,
+        y: centerY - 60,
+        lines: [
+          'Welcome to the Grasslands, traveler. These fields have been my home for many seasons.',
+          'Beware the shadows stirring in the Forest to the east — creatures not seen for an age.',
+          'Take care, and may the old light guide your path.',
+        ],
+      },
+      {
+        id: 'magnus',
+        name: 'Old Magnus',
+        x: centerX + 110,
+        y: centerY - 60,
+        lines: [
+          'Hmph. Another young soul wandering into ruin.',
+          'Past the Forest lies the Dungeon Entrance — none who ventured within have returned whole.',
+          'If you must go, gather strength. Slay beasts. Crack open chests. Only then stand a chance.',
+        ],
+      },
+    ],
+    transitions: { east: 'forest' },
+  },
+  forest: {
+    numTrees: 90,
+    obstacleDensity: 0.08,
+    enemySpawns: [
+      { tx: 14, ty: 20, axis: 'x' },
+      { tx: 44, ty: 22, axis: 'y' },
+      { tx: 22, ty: 44, axis: 'x' },
+      { tx: 42, ty: 42, axis: 'y' },
+      { tx: 30, ty: 14, axis: 'x' },
+      { tx: 18, ty: 32, axis: 'y' },
+    ],
+    heartSpawns: [
+      { tx: 30, ty: 30 },
+      { tx: 42, ty: 16 },
+    ],
+    npcs: [],
+    transitions: { west: 'grasslands', east: 'dungeon' },
+  },
+  dungeon: {
+    numTrees: 4,
+    obstacleDensity: 0.22,
+    enemySpawns: [
+      { tx: 18, ty: 20, axis: 'x' },
+      { tx: 42, ty: 20, axis: 'y' },
+      { tx: 18, ty: 40, axis: 'y' },
+      { tx: 42, ty: 40, axis: 'x' },
+      { tx: 30, ty: 30, axis: 'x' },
+      { tx: 30, ty: 16, axis: 'y' },
+      { tx: 14, ty: 30, axis: 'x' },
+    ],
+    heartSpawns: [{ tx: 30, ty: 46 }],
+    npcs: [],
+    transitions: { west: 'forest' },
+  },
+};
 
 export class MainScene extends Phaser.Scene {
   private player!: Player;
   private enemies: Enemy[] = [];
   private items: Item[] = [];
+  private npcs: NPC[] = [];
+  private transitionZones: Array<{ zone: Phaser.GameObjects.Zone; target: ZoneId; edge: EdgeDirection }> = [];
   private treeGroup!: Phaser.GameObjects.Group;
   private groundLayer!: Phaser.Tilemaps.TilemapLayer;
   private obstacles!: Phaser.Physics.Arcade.StaticGroup;
@@ -55,6 +139,9 @@ export class MainScene extends Phaser.Scene {
 
   private inventory: InventoryItem[] = [];
   private activeChest: Item | null = null;
+  private activeNpc: NPC | null = null;
+  private currentZone: ZoneId = 'grasslands';
+  private isTransitioning = false;
 
   constructor() {
     super({ key: 'MainScene' });
@@ -73,20 +160,28 @@ export class MainScene extends Phaser.Scene {
     this.buildTilemap();
     this.createObstacleTextures();
     Item.ensureTextures(this);
-    this.placeTrees();
-    this.placeObstacles();
+    NPC.ensureTextures(this);
 
-    this.player = new Player(this, WORLD_WIDTH / 2, WORLD_HEIGHT / 2);
-    this.spawnEnemies();
-    this.spawnInitialItems();
-    this.setupColliders();
+    this.obstacles = this.physics.add.staticGroup();
+    this.treeObstacles = this.physics.add.staticGroup();
+    this.treeGroup = this.add.group();
 
-    this.sortTrees();
+    this.player = new Player(this, centerX, centerY);
+    this.setupPersistentColliders();
+
+    this.loadZone('grasslands', null);
+
     this.setupCamera();
     this.setupDepth();
 
     this.inventory = [];
     this.emitInventoryChange();
+
+    // React → Phaser: dialog close signal
+    this.game.events.on(GAME_EVENTS.DIALOG_CLOSE, this.handleDialogClose, this);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.game.events.off(GAME_EVENTS.DIALOG_CLOSE, this.handleDialogClose, this);
+    });
   }
 
   // ─── Tilemap ──────────────────────────────────────────────────────────────
@@ -116,23 +211,19 @@ export class MainScene extends Phaser.Scene {
     }
   }
 
-  // ─── Obstacle textures ────────────────────────────────────────────────────
+  // ─── Textures ─────────────────────────────────────────────────────────────
 
   private createObstacleTextures(): void {
     if (!this.textures.exists('rock')) {
       const gfx = this.add.graphics();
       const s = 28;
-
       gfx.fillStyle(0x78716c, 1);
       gfx.fillEllipse(s / 2, s / 2 + 2, s - 2, s - 8);
-
       gfx.fillStyle(0xa8a29e, 1);
       gfx.fillEllipse(s / 2 - 3, s / 2 - 2, s - 10, s - 16);
-
       gfx.lineStyle(1, 0x57534e, 0.8);
       gfx.strokeLineShape(new Phaser.Geom.Line(10, 14, 16, 20));
       gfx.strokeLineShape(new Phaser.Geom.Line(16, 20, 20, 16));
-
       gfx.generateTexture('rock', s, s);
       gfx.destroy();
     }
@@ -148,21 +239,17 @@ export class MainScene extends Phaser.Scene {
 
   // ─── Trees ────────────────────────────────────────────────────────────────
 
-  private placeTrees(): void {
+  private placeTrees(count: number): void {
     TREE_POSITIONS.length = 0;
-    this.treeGroup = this.add.group();
-
     const margin = 3;
-    const cx = WORLD_WIDTH / 2;
-    const cy = WORLD_HEIGHT / 2;
 
-    for (let i = 0; i < NUM_TREES; i++) {
+    for (let i = 0; i < count; i++) {
       const tx = Phaser.Math.Between(margin, MAP_WIDTH - margin);
       const ty = Phaser.Math.Between(margin, MAP_HEIGHT - margin);
       const px = tx * TILE_SIZE + TILE_SIZE / 2;
       const py = ty * TILE_SIZE + TILE_SIZE / 2;
 
-      if (Math.abs(px - cx) < 120 && Math.abs(py - cy) < 120) continue;
+      if (Math.abs(px - centerX) < 120 && Math.abs(py - centerY) < 120) continue;
 
       TREE_POSITIONS.push({ x: px, y: py });
       this.drawTree(px, py);
@@ -173,16 +260,22 @@ export class MainScene extends Phaser.Scene {
     const trunkGfx = this.add.graphics();
     trunkGfx.fillStyle(0x6b4226, 1);
     trunkGfx.fillRect(-5, -6, 10, 12);
-    trunkGfx.generateTexture(`tree-trunk-${x}-${y}`, 10, 12);
+    const trunkKey = `tree-trunk-${x}-${y}`;
+    if (!this.textures.exists(trunkKey)) {
+      trunkGfx.generateTexture(trunkKey, 10, 12);
+    }
     trunkGfx.destroy();
 
     const shadowGfx = this.add.graphics();
     shadowGfx.fillStyle(0x000000, 0.2);
     shadowGfx.fillEllipse(0, 0, 38, 14);
-    shadowGfx.generateTexture(`tree-shadow-${x}-${y}`, 38, 14);
+    const shadowKey = `tree-shadow-${x}-${y}`;
+    if (!this.textures.exists(shadowKey)) {
+      shadowGfx.generateTexture(shadowKey, 38, 14);
+    }
     shadowGfx.destroy();
 
-    const shadow = this.add.image(x + 6, y + 10, `tree-shadow-${x}-${y}`);
+    const shadow = this.add.image(x + 6, y + 10, shadowKey);
     shadow.setDepth(0.1);
 
     const canopyGfx = this.add.graphics();
@@ -191,12 +284,15 @@ export class MainScene extends Phaser.Scene {
     canopyGfx.fillStyle(0x3a8044, 1);
     canopyGfx.fillCircle(-7, -6, 14);
     canopyGfx.fillCircle(8, -4, 16);
-    canopyGfx.generateTexture(`tree-canopy-${x}-${y}`, 48, 48);
+    const canopyKey = `tree-canopy-${x}-${y}`;
+    if (!this.textures.exists(canopyKey)) {
+      canopyGfx.generateTexture(canopyKey, 48, 48);
+    }
     canopyGfx.destroy();
 
-    const trunk = this.add.image(x, y, `tree-trunk-${x}-${y}`);
+    const trunk = this.add.image(x, y, trunkKey);
     trunk.setDepth(y);
-    const canopy = this.add.image(x, y - 18, `tree-canopy-${x}-${y}`);
+    const canopy = this.add.image(x, y - 18, canopyKey);
     canopy.setDepth(y + 0.5);
 
     this.treeGroup.add(shadow);
@@ -206,10 +302,7 @@ export class MainScene extends Phaser.Scene {
 
   // ─── Obstacles ────────────────────────────────────────────────────────────
 
-  private placeObstacles(): void {
-    this.obstacles = this.physics.add.staticGroup();
-    this.treeObstacles = this.physics.add.staticGroup();
-
+  private placeObstacles(density: number, protectedTiles: Set<string>): void {
     const centerTX = Math.floor(MAP_WIDTH / 2);
     const centerTY = Math.floor(MAP_HEIGHT / 2);
 
@@ -224,19 +317,6 @@ export class MainScene extends Phaser.Scene {
       }
     }
 
-    const enemyTiles = new Set<string>(
-      ENEMY_SPAWNS.flatMap(({ tx, ty }) => [
-        `${tx},${ty}`, `${tx - 1},${ty}`, `${tx + 1},${ty}`,
-        `${tx},${ty - 1}`, `${tx},${ty + 1}`,
-      ])
-    );
-
-    const heartTiles = new Set<string>(
-      INITIAL_HEART_SPAWNS.flatMap(({ tx, ty }) => [
-        `${tx},${ty}`, `${tx - 1},${ty}`, `${tx + 1},${ty}`,
-      ])
-    );
-
     for (let ty = 0; ty < MAP_HEIGHT; ty++) {
       for (let tx = 0; tx < MAP_WIDTH; tx++) {
         const dFromSpawn = Math.max(
@@ -244,10 +324,11 @@ export class MainScene extends Phaser.Scene {
           Math.abs(ty - centerTY)
         );
         if (dFromSpawn < SPAWN_SAFE_TILES) continue;
+        // Keep map edges clear so transition strips are walkable
+        if (tx < 2 || tx > MAP_WIDTH - 3) continue;
         if (treeTiles.has(`${tx},${ty}`)) continue;
-        if (enemyTiles.has(`${tx},${ty}`)) continue;
-        if (heartTiles.has(`${tx},${ty}`)) continue;
-        if (Math.random() > OBSTACLE_DENSITY) continue;
+        if (protectedTiles.has(`${tx},${ty}`)) continue;
+        if (Math.random() > density) continue;
 
         const px = tx * TILE_SIZE + TILE_SIZE / 2;
         const py = ty * TILE_SIZE + TILE_SIZE / 2;
@@ -267,22 +348,97 @@ export class MainScene extends Phaser.Scene {
     }
   }
 
+  // ─── Zone loading ─────────────────────────────────────────────────────────
+
+  private loadZone(zone: ZoneId, enteredFrom: EdgeDirection | null): void {
+    this.currentZone = zone;
+    const config = ZONE_CONFIGS[zone];
+
+    this.clearZoneContent();
+
+    // Tint ground
+    this.groundLayer.setTint(ZONES[zone].tint);
+
+    // Build protected tile set from enemies, hearts, and NPCs
+    const protectedTiles = new Set<string>();
+    for (const spawn of config.enemySpawns) {
+      protectedTiles.add(`${spawn.tx},${spawn.ty}`);
+    }
+    for (const spawn of config.heartSpawns) {
+      protectedTiles.add(`${spawn.tx},${spawn.ty}`);
+    }
+    for (const npc of config.npcs) {
+      const tx = Math.floor(npc.x / TILE_SIZE);
+      const ty = Math.floor(npc.y / TILE_SIZE);
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          protectedTiles.add(`${tx + dx},${ty + dy}`);
+        }
+      }
+    }
+
+    this.placeTrees(config.numTrees);
+    this.placeObstacles(config.obstacleDensity, protectedTiles);
+    this.spawnEnemies(config.enemySpawns);
+    this.spawnInitialItems(config.heartSpawns);
+    this.spawnNPCs(config.npcs);
+    this.createTransitionZones(config.transitions);
+
+    // Position player
+    if (enteredFrom === 'east') {
+      // Came through east edge of previous zone → appear at west side
+      this.player.setPosition(TILE_SIZE * 3, centerY);
+    } else if (enteredFrom === 'west') {
+      this.player.setPosition(WORLD_WIDTH - TILE_SIZE * 3, centerY);
+    } else {
+      this.player.setPosition(centerX, centerY);
+    }
+
+    this.player.setDepth(this.player.y + 1);
+
+    this.game.events.emit(GAME_EVENTS.ZONE_CHANGE, this.currentZone);
+  }
+
+  private clearZoneContent(): void {
+    for (const enemy of this.enemies) enemy.destroy();
+    this.enemies.length = 0;
+
+    for (const item of this.items) item.destroy();
+    this.items.length = 0;
+
+    for (const npc of this.npcs) npc.destroy();
+    this.npcs.length = 0;
+
+    for (const t of this.transitionZones) t.zone.destroy();
+    this.transitionZones.length = 0;
+
+    this.treeGroup.clear(true, true);
+    this.obstacles.clear(true, true);
+    this.treeObstacles.clear(true, true);
+
+    this.activeChest = null;
+    this.activeNpc = null;
+  }
+
   // ─── Enemies ──────────────────────────────────────────────────────────────
 
-  private spawnEnemies(): void {
-    this.enemies = [];
-    for (const spawn of ENEMY_SPAWNS) {
+  private spawnEnemies(spawns: ZoneConfig['enemySpawns']): void {
+    for (const spawn of spawns) {
       const px = spawn.tx * TILE_SIZE + TILE_SIZE / 2;
       const py = spawn.ty * TILE_SIZE + TILE_SIZE / 2;
-      this.enemies.push(new Enemy(this, px, py, spawn.axis));
+      const enemy = new Enemy(this, px, py, spawn.axis);
+      this.enemies.push(enemy);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      this.physics.add.collider(enemy as any, this.obstacles);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      this.physics.add.collider(enemy as any, this.treeObstacles);
     }
   }
 
   // ─── Items ────────────────────────────────────────────────────────────────
 
-  private spawnInitialItems(): void {
-    this.items = [];
-    for (const spawn of INITIAL_HEART_SPAWNS) {
+  private spawnInitialItems(spawns: ZoneConfig['heartSpawns']): void {
+    for (const spawn of spawns) {
       const px = spawn.tx * TILE_SIZE + TILE_SIZE / 2;
       const py = spawn.ty * TILE_SIZE + TILE_SIZE / 2;
       this.spawnWorldItem(px, py, 'heart_pickup');
@@ -299,20 +455,79 @@ export class MainScene extends Phaser.Scene {
     return item;
   }
 
-  // ─── Physics setup ────────────────────────────────────────────────────────
+  // ─── NPCs ─────────────────────────────────────────────────────────────────
 
-  private setupColliders(): void {
+  private spawnNPCs(defs: NPCDefinition[]): void {
+    for (const def of defs) {
+      const npc = new NPC(this, def);
+      this.npcs.push(npc);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      this.physics.add.collider(this.player, npc as any);
+    }
+  }
+
+  // ─── Transitions ──────────────────────────────────────────────────────────
+
+  private createTransitionZones(transitions: ZoneConfig['transitions']): void {
+    const edgeHeight = WORLD_HEIGHT - 4 * TILE_SIZE;
+
+    if (transitions.east) {
+      const zone = this.add.zone(
+        WORLD_WIDTH - TRANSITION_ZONE_THICKNESS / 2,
+        centerY,
+        TRANSITION_ZONE_THICKNESS,
+        edgeHeight
+      );
+      this.physics.add.existing(zone);
+      const body = zone.body as Phaser.Physics.Arcade.Body;
+      body.setAllowGravity(false);
+      body.setImmovable(true);
+      this.transitionZones.push({ zone, target: transitions.east, edge: 'east' });
+      this.physics.add.overlap(this.player, zone, () => {
+        this.changeToZone('east', transitions.east!);
+      });
+    }
+
+    if (transitions.west) {
+      const zone = this.add.zone(
+        TRANSITION_ZONE_THICKNESS / 2,
+        centerY,
+        TRANSITION_ZONE_THICKNESS,
+        edgeHeight
+      );
+      this.physics.add.existing(zone);
+      const body = zone.body as Phaser.Physics.Arcade.Body;
+      body.setAllowGravity(false);
+      body.setImmovable(true);
+      this.transitionZones.push({ zone, target: transitions.west, edge: 'west' });
+      this.physics.add.overlap(this.player, zone, () => {
+        this.changeToZone('west', transitions.west!);
+      });
+    }
+  }
+
+  private changeToZone(fromDirection: EdgeDirection, nextZone: ZoneId): void {
+    if (this.isTransitioning) return;
+    this.isTransitioning = true;
+    this.player.setFrozen(true);
+
+    this.cameras.main.fadeOut(TRANSITION_FADE_MS, 0, 0, 0);
+    this.cameras.main.once('camerafadeoutcomplete', () => {
+      this.loadZone(nextZone, fromDirection);
+      this.cameras.main.fadeIn(TRANSITION_FADE_MS, 0, 0, 0);
+      this.cameras.main.once('camerafadeincomplete', () => {
+        this.isTransitioning = false;
+        this.player.setFrozen(false);
+      });
+    });
+  }
+
+  // ─── Persistent colliders (set up once, use array refs) ───────────────────
+
+  private setupPersistentColliders(): void {
     this.physics.add.collider(this.player, this.obstacles);
     this.physics.add.collider(this.player, this.treeObstacles);
 
-    for (const enemy of this.enemies) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      this.physics.add.collider(enemy as any, this.obstacles);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      this.physics.add.collider(enemy as any, this.treeObstacles);
-    }
-
-    // Player body ↔ enemies → deal damage
     this.physics.add.overlap(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       this.player as any,
@@ -326,7 +541,6 @@ export class MainScene extends Phaser.Scene {
       this
     );
 
-    // Attack zone ↔ enemies → apply damage to enemies
     this.physics.add.overlap(
       this.player.getAttackZone(),
       this.enemies as unknown as Phaser.GameObjects.GameObject[],
@@ -342,6 +556,8 @@ export class MainScene extends Phaser.Scene {
 
   private onEnemyDeath(x: number, y: number): void {
     this.enemies = this.enemies.filter((e) => !e.isDying() && e.active);
+    // Note: array replaced, but overlaps were registered with original ref
+    // → re-seed the original array contents after filter
     if (Math.random() < CHEST_DROP_CHANCE) {
       this.spawnWorldItem(x, y, 'chest');
     }
@@ -361,73 +577,95 @@ export class MainScene extends Phaser.Scene {
     this.game.events.emit(GAME_EVENTS.INVENTORY_CHANGE, [...this.inventory]);
   }
 
-  // ─── Chest / pickup interaction ───────────────────────────────────────────
+  // ─── Interaction (NPC priority over chest) ────────────────────────────────
 
-  private updateItemInteractions(): void {
-    // Clean up destroyed items first
+  private updateInteractions(): void {
     this.items = this.items.filter((item) => item.active);
+    this.npcs = this.npcs.filter((n) => n.active);
 
-    let nearestChest: Item | null = null;
-    let nearestDist = CHEST_INTERACT_RADIUS;
-
+    // Auto-collect heart pickups
     for (const item of this.items) {
-      const dist = Phaser.Math.Distance.Between(item.x, item.y, this.player.x, this.player.y);
-
-      if (item.itemType === 'heart_pickup' && !item.isOpened() && dist < 22) {
-        item.collect(() => {
-          this.player.heal(HEART_HEAL_AMOUNT);
-          this.addToInventory('heart');
-        });
-        continue;
+      if (item.itemType === 'heart_pickup' && !item.isOpened()) {
+        const dist = Phaser.Math.Distance.Between(item.x, item.y, this.player.x, this.player.y);
+        if (dist < 22) {
+          item.collect(() => {
+            this.player.heal(HEART_HEAL_AMOUNT);
+            this.addToInventory('heart');
+          });
+        }
       }
+    }
 
-      if (item.itemType === 'chest' && !item.isOpened()) {
-        if (dist < nearestDist) {
-          nearestDist = dist;
+    // NPC proximity
+    let nearestNpc: NPC | null = null;
+    let nearestNpcDist = NPC_INTERACT_RADIUS;
+    for (const npc of this.npcs) {
+      const d = Phaser.Math.Distance.Between(npc.x, npc.y, this.player.x, this.player.y);
+      if (d < nearestNpcDist) {
+        nearestNpcDist = d;
+        nearestNpc = npc;
+      }
+    }
+
+    // Chest proximity (only if no NPC is available)
+    let nearestChest: Item | null = null;
+    if (!nearestNpc) {
+      let nearestChestDist = CHEST_INTERACT_RADIUS;
+      for (const item of this.items) {
+        if (item.itemType !== 'chest' || item.isOpened()) continue;
+        const d = Phaser.Math.Distance.Between(item.x, item.y, this.player.x, this.player.y);
+        if (d < nearestChestDist) {
+          nearestChestDist = d;
           nearestChest = item;
         }
       }
     }
 
-    // Update chest prompt state
+    // Update prompts
+    if (nearestNpc !== this.activeNpc) {
+      this.activeNpc?.showInteractPrompt(false);
+      this.activeNpc = nearestNpc;
+    }
     if (nearestChest !== this.activeChest) {
       this.activeChest?.showInteractPrompt(false);
       this.activeChest = nearestChest;
     }
 
-    if (this.activeChest) {
+    if (this.activeNpc) {
+      this.activeNpc.showInteractPrompt(true);
+      this.player.setNearInteractable(true);
+      if (this.player.wantsInteract()) {
+        this.openDialog(this.activeNpc);
+      }
+    } else if (this.activeChest) {
       this.activeChest.showInteractPrompt(true);
-      this.player.setNearChest(true);
-
+      this.player.setNearInteractable(true);
       if (this.player.wantsInteract()) {
         const reward = this.activeChest.openChest();
-        if (reward) {
-          this.applyChestReward(reward);
-        }
+        if (reward) this.applyChestReward(reward);
         this.activeChest = null;
       }
     } else {
-      this.player.setNearChest(false);
+      this.player.setNearInteractable(false);
     }
   }
 
+  private openDialog(npc: NPC): void {
+    this.player.setDialogActive(true);
+    const payload: DialogPayload = { npcName: npc.npcName, lines: npc.lines };
+    this.game.events.emit(GAME_EVENTS.DIALOG_OPEN, payload);
+  }
+
+  private handleDialogClose(): void {
+    this.player.setDialogActive(false);
+  }
+
   private applyChestReward(reward: InventoryItem): void {
-    if (reward === 'heart') {
-      this.player.heal(HEART_HEAL_AMOUNT);
-    }
+    if (reward === 'heart') this.player.heal(HEART_HEAL_AMOUNT);
     this.addToInventory(reward);
   }
 
   // ─── Camera & depth ───────────────────────────────────────────────────────
-
-  private sortTrees(): void {
-    this.children.each((child) => {
-      const img = child as Phaser.GameObjects.Image;
-      if (img.depth === undefined || img.depth === 0) {
-        img.setDepth(img.y ?? 0);
-      }
-    });
-  }
 
   private setupCamera(): void {
     this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
@@ -454,6 +692,12 @@ export class MainScene extends Phaser.Scene {
       if (item.active) item.update(delta);
     }
 
-    this.updateItemInteractions();
+    for (const npc of this.npcs) {
+      if (npc.active) npc.update(delta);
+    }
+
+    if (!this.isTransitioning && !this.player.isDialogActive()) {
+      this.updateInteractions();
+    }
   }
 }

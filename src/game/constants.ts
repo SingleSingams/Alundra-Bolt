@@ -39,6 +39,33 @@ export const GAME_EVENTS = {
   PLAYER_ATTACK: 'player-attack',
   INVENTORY_CHANGE: 'inventory-change',
   CHEST_PROXIMITY: 'chest-proximity',
+  ZONE_CHANGE: 'zone-change',
+  DIALOG_OPEN: 'dialog-open',
+  DIALOG_CLOSE: 'dialog-close',
 } as const;
 
 export type InventoryItem = 'heart' | 'sword_upgrade';
+
+export type ZoneId = 'grasslands' | 'forest' | 'dungeon';
+
+export interface ZoneMeta {
+  id: ZoneId;
+  name: string;
+  tint: number;
+}
+
+export const ZONES: Record<ZoneId, ZoneMeta> = {
+  grasslands: { id: 'grasslands', name: 'Grasslands', tint: 0xffffff },
+  forest: { id: 'forest', name: 'Forest', tint: 0x78a878 },
+  dungeon: { id: 'dungeon', name: 'Dungeon Entrance', tint: 0x8a8a8a },
+};
+
+export const ZONE_ORDER: ZoneId[] = ['grasslands', 'forest', 'dungeon'];
+
+export const TRANSITION_FADE_MS = 500;
+export const TRANSITION_EDGE_TILES = 2;
+
+export interface DialogPayload {
+  npcName: string;
+  lines: string[];
+}

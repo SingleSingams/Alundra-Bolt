@@ -59,6 +59,8 @@ export class Player extends Phaser.GameObjects.Container {
   private attackCooldown = 0;
   private attackTimer = 0;
   private nearChest = false;
+  private dialogActive = false;
+  private frozen = false;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     super(scene, x, y);
@@ -126,6 +128,14 @@ export class Player extends Phaser.GameObjects.Container {
   }
 
   update(delta: number): void {
+    if (this.dialogActive || this.frozen) {
+      const body = this.body as Phaser.Physics.Arcade.Body;
+      body.setVelocity(0, 0);
+      this.updateSpritePosition();
+      this.updateInvincibility(delta);
+      return;
+    }
+
     this.handleMovement();
     this.handleJump();
     this.handleAttack(delta);
@@ -377,11 +387,39 @@ export class Player extends Phaser.GameObjects.Container {
     return this.attackZone;
   }
 
-  setNearChest(value: boolean): void {
+  setNearInteractable(value: boolean): void {
     this.nearChest = value;
   }
 
+  setDialogActive(value: boolean): void {
+    this.dialogActive = value;
+    if (value) {
+      const body = this.body as Phaser.Physics.Arcade.Body;
+      body.setVelocity(0, 0);
+      if (this.isAttacking) {
+        this.isAttacking = false;
+        const zoneBody = this.attackZone.body as Phaser.Physics.Arcade.Body;
+        zoneBody.enable = false;
+        this.slashGfx.clear();
+        this.sprite.setScale(1);
+      }
+    }
+  }
+
+  setFrozen(value: boolean): void {
+    this.frozen = value;
+    if (value) {
+      const body = this.body as Phaser.Physics.Arcade.Body;
+      body.setVelocity(0, 0);
+    }
+  }
+
+  isDialogActive(): boolean {
+    return this.dialogActive;
+  }
+
   wantsInteract(): boolean {
+    if (this.dialogActive || this.frozen) return false;
     return (
       Phaser.Input.Keyboard.JustDown(this.keys.jumpZ) ||
       Phaser.Input.Keyboard.JustDown(this.keys.spaceJump)
