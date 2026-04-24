@@ -66,6 +66,11 @@ export class Player extends Phaser.GameObjects.Container {
 
   private zoneBobMult = 1.0;
 
+  // Cached per-frame key states — JustDown consumes the flag on first call,
+  // so we read it exactly once per key per frame and share the result.
+  private jumpPressedThisFrame = false;
+  private attackPressedThisFrame = false;
+
   constructor(scene: Phaser.Scene, x: number, y: number) {
     super(scene, x, y);
 
@@ -132,6 +137,12 @@ export class Player extends Phaser.GameObjects.Container {
   }
 
   update(delta: number): void {
+    // Read JustDown once per frame before any handler can consume the flag.
+    this.jumpPressedThisFrame =
+      Phaser.Input.Keyboard.JustDown(this.keys.jumpZ) ||
+      Phaser.Input.Keyboard.JustDown(this.keys.spaceJump);
+    this.attackPressedThisFrame = Phaser.Input.Keyboard.JustDown(this.keys.attackX);
+
     if (this.dialogActive || this.frozen) {
       const body = this.body as Phaser.Physics.Arcade.Body;
       body.setVelocity(0, 0);
@@ -190,11 +201,7 @@ export class Player extends Phaser.GameObjects.Container {
   }
 
   private handleJump(): void {
-    const { jumpZ, spaceJump } = this.keys;
-    const jumpPressed =
-      Phaser.Input.Keyboard.JustDown(jumpZ) || Phaser.Input.Keyboard.JustDown(spaceJump);
-
-    if (jumpPressed && !this.isJumping && !this.nearChest) {
+    if (this.jumpPressedThisFrame && !this.isJumping && !this.nearChest) {
       this.startJump();
     }
   }
@@ -210,8 +217,7 @@ export class Player extends Phaser.GameObjects.Container {
       }
     }
 
-    const { attackX } = this.keys;
-    if (Phaser.Input.Keyboard.JustDown(attackX) && !this.isAttacking && this.attackCooldown <= 0) {
+    if (this.attackPressedThisFrame && !this.isAttacking && this.attackCooldown <= 0) {
       this.startAttack();
     }
   }
@@ -454,9 +460,6 @@ export class Player extends Phaser.GameObjects.Container {
 
   wantsInteract(): boolean {
     if (this.dialogActive || this.frozen) return false;
-    return (
-      Phaser.Input.Keyboard.JustDown(this.keys.jumpZ) ||
-      Phaser.Input.Keyboard.JustDown(this.keys.spaceJump)
-    );
+    return this.jumpPressedThisFrame;
   }
 }
