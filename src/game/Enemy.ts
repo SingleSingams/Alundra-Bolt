@@ -188,12 +188,10 @@ export class Enemy extends Phaser.GameObjects.Container {
     this.hp = Math.max(0, this.hp - amount);
     this.hitInvulnTimer = ENEMY_HIT_INVULN_MS;
 
-    // White hit flash for ~3 frames (fill-tint replaces all sprite colors)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (this.sprite as any).setTintFill?.(0xffffff);
-    if (!(this.sprite as unknown as { tintFill: boolean }).tintFill) {
-      this.sprite.setTint(0xffffff);
-    }
+    // White hit flash — Phaser 4 uses setTint + setTintMode(FILL) instead of setTintFill
+    this.sprite.setTint(0xffffff);
+    (this.sprite as Phaser.GameObjects.Image & { setTintMode?: (m: number) => void })
+      .setTintMode?.(1); // 1 = FILL in Phaser 4
     this.scene.time.delayedCall(ENEMY_FLASH_MS, () => {
       if (this.dying) return;
       this.sprite.clearTint();
