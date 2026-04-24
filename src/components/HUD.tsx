@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { cn } from '../lib/utils';
 import {
   InventoryItem,
@@ -8,19 +9,24 @@ import {
 } from '../game/constants';
 import { MapPin } from 'lucide-react';
 
+type HeartAnimState = 'damage' | 'heal' | null;
+
 interface HeartProps {
   filled: boolean;
   half?: boolean;
   index: number;
+  animState: HeartAnimState;
 }
 
-function Heart({ filled, half, index }: HeartProps) {
+function Heart({ filled, half, index, animState }: HeartProps) {
   return (
     <div
-      className="relative"
-      style={{
-        transitionDelay: `${index * 40}ms`,
-      }}
+      className={cn(
+        'relative',
+        animState === 'damage' && 'heart-shake',
+        animState === 'heal' && 'heart-bounce'
+      )}
+      style={{ transitionDelay: `${index * 40}ms` }}
     >
       <svg
         width="28"
@@ -126,7 +132,6 @@ function SwordIcon() {
           <stop offset="100%" stopColor="#6b7280" />
         </linearGradient>
       </defs>
-      {/* Blade */}
       <polygon
         points="17,3 21,3 21,7 8,20 5,20 5,17"
         fill="url(#inv-blade)"
@@ -134,7 +139,6 @@ function SwordIcon() {
         strokeWidth="0.8"
         strokeLinejoin="round"
       />
-      {/* Cross guard */}
       <rect
         x="3.5"
         y="15"
@@ -145,7 +149,6 @@ function SwordIcon() {
         stroke="#451a03"
         strokeWidth="0.6"
       />
-      {/* Grip */}
       <rect
         x="2"
         y="19"
@@ -156,7 +159,6 @@ function SwordIcon() {
         stroke="#0f172a"
         strokeWidth="0.6"
       />
-      {/* Pommel */}
       <circle cx="3" cy="21" r="1.3" fill="#eab308" stroke="#854d0e" strokeWidth="0.5" />
     </svg>
   );
@@ -292,6 +294,23 @@ export function HUD({ hp, maxHp, isJumping, inventory, zone }: HUDProps) {
   const fullHearts = Math.floor(hp / 2);
   const hasHalf = hp % 2 === 1;
   const totalSlots = Math.ceil(maxHp / 2);
+  const prevHpRef = useRef(hp);
+  const [heartAnim, setHeartAnim] = useState<HeartAnimState>(null);
+  const animTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const prev = prevHpRef.current;
+    if (hp === prev) return;
+
+    if (animTimerRef.current) clearTimeout(animTimerRef.current);
+
+    setHeartAnim(hp < prev ? 'damage' : 'heal');
+    animTimerRef.current = setTimeout(() => {
+      setHeartAnim(null);
+    }, hp < prev ? 380 : 280);
+
+    prevHpRef.current = hp;
+  }, [hp]);
 
   return (
     <>
@@ -313,6 +332,7 @@ export function HUD({ hp, maxHp, isJumping, inventory, zone }: HUDProps) {
                   index={i}
                   filled={isFull}
                   half={isHalf}
+                  animState={heartAnim}
                 />
               );
             })}

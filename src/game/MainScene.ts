@@ -142,6 +142,8 @@ export class MainScene extends Phaser.Scene {
   private activeNpc: NPC | null = null;
   private currentZone: ZoneId = 'grasslands';
   private isTransitioning = false;
+  private isFreezeFraming = false;
+  private ambientBreathTime = 0;
 
   constructor() {
     super({ key: 'MainScene' });
@@ -159,6 +161,7 @@ export class MainScene extends Phaser.Scene {
 
     this.buildTilemap();
     this.createObstacleTextures();
+    this.createParticleTexture();
     Item.ensureTextures(this);
     NPC.ensureTextures(this);
 
@@ -179,8 +182,12 @@ export class MainScene extends Phaser.Scene {
 
     // React → Phaser: dialog close signal
     this.game.events.on(GAME_EVENTS.DIALOG_CLOSE, this.handleDialogClose, this);
+    // Player damage → particles via game event
+    this.game.events.on(GAME_EVENTS.PLAYER_DAMAGED, this.onPlayerDamaged, this);
+
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off(GAME_EVENTS.DIALOG_CLOSE, this.handleDialogClose, this);
+      this.game.events.off(GAME_EVENTS.PLAYER_DAMAGED, this.onPlayerDamaged, this);
     });
   }
 
@@ -233,6 +240,16 @@ export class MainScene extends Phaser.Scene {
       gfx.fillStyle(0xffffff, 0.01);
       gfx.fillRect(0, 0, 18, 14);
       gfx.generateTexture('blocker', 18, 14);
+      gfx.destroy();
+    }
+  }
+
+  private createParticleTexture(): void {
+    if (!this.textures.exists('particle-sq')) {
+      const gfx = this.add.graphics();
+      gfx.fillStyle(0xffffff, 1);
+      gfx.fillRect(0, 0, 5, 5);
+      gfx.generateTexture('particle-sq', 5, 5);
       gfx.destroy();
     }
   }
@@ -324,7 +341,6 @@ export class MainScene extends Phaser.Scene {
           Math.abs(ty - centerTY)
         );
         if (dFromSpawn < SPAWN_SAFE_TILES) continue;
-        // Keep map edges clear so transition strips are walkable
         if (tx < 2 || tx > MAP_WIDTH - 3) continue;
         if (treeTiles.has(`${tx},${ty}`)) continue;
         if (protectedTiles.has(`${tx},${ty}`)) continue;
@@ -356,10 +372,8 @@ export class MainScene extends Phaser.Scene {
 
     this.clearZoneContent();
 
-    // Tint ground
     this.groundLayer.setTint(ZONES[zone].tint);
 
-    // Build protected tile set from enemies, hearts, and NPCs
     const protectedTiles = new Set<string>();
     for (const spawn of config.enemySpawns) {
       protectedTiles.add(`${spawn.tx},${spawn.ty}`);
@@ -384,9 +398,7 @@ export class MainScene extends Phaser.Scene {
     this.spawnNPCs(config.npcs);
     this.createTransitionZones(config.transitions);
 
-    // Position player
     if (enteredFrom === 'east') {
-      // Came through east edge of previous zone → appear at west side
       this.player.setPosition(TILE_SIZE * 3, centerY);
     } else if (enteredFrom === 'west') {
       this.player.setPosition(WORLD_WIDTH - TILE_SIZE * 3, centerY);
@@ -394,6 +406,7 @@ export class MainScene extends Phaser.Scene {
       this.player.setPosition(centerX, centerY);
     }
 
+    this.player.setZone(zone);
     this.player.setDepth(this.player.y + 1);
 
     this.game.events.emit(GAME_EVENTS.ZONE_CHANGE, this.currentZone);
@@ -461,8 +474,7 @@ export class MainScene extends Phaser.Scene {
     for (const def of defs) {
       const npc = new NPC(this, def);
       this.npcs.push(npc);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      this.physics.add.collider(this.player, npc as any);
+      this.physics.add.collider(this.player, npc as unknown as Phaser.GameObjects.GameObject);
     }
   }
 
@@ -548,6 +560,11 @@ export class MainScene extends Phaser.Scene {
         const enemy = enemyObj as Enemy;
         if (!enemy.canBeHit()) return;
         enemy.takeDamage(ATTACK_DAMAGE, (ex, ey) => this.onEnemyDeath(ex, ey));
+
+        this.cameras.main.shake(120, 0.004);
+        this.spawnParticleBurst(enemy.x, enemy.y, 0xef4444, 7, 50, 320);
+        this.showDamageNumber(enemy.x, enemy.y - 10, ATTACK_DAMAGE, false);
+        this.triggerFreezeFrame(50);
       },
       undefined,
       this
@@ -556,11 +573,98 @@ export class MainScene extends Phaser.Scene {
 
   private onEnemyDeath(x: number, y: number): void {
     this.enemies = this.enemies.filter((e) => !e.isDying() && e.active);
-    // Note: array replaced, but overlaps were registered with original ref
-    // → re-seed the original array contents after filter
     if (Math.random() < CHEST_DROP_CHANCE) {
       this.spawnWorldItem(x, y, 'chest');
     }
+    // Big death burst + screen flash
+    this.spawnParticleBurst(x, y, 0xef4444, 12, 70, 500);
+    this.spawnParticleBurst(x, y, 0xfbbf24, 6, 45, 400);
+    this.flashScreen();
+  }
+
+  // ─── Player damaged handler ───────────────────────────────────────────────
+
+  private onPlayerDamaged(pos: { x: number; y: number }): void {
+    this.spawnParticleBurst(pos.x, pos.y, 0xffffff, 8, 55, 350);
+    this.spawnParticleBurst(pos.x, pos.y, 0xfde68a, 5, 35, 280);
+    this.showDamageNumber(pos.x, pos.y - 10, 2, false);
+  }
+
+  // ─── Juice helpers ────────────────────────────────────────────────────────
+
+  private spawnParticleBurst(
+    x: number, y: number,
+    color: number,
+    count: number,
+    spread: number,
+    lifetime: number
+  ): void {
+    for (let i = 0; i < count; i++) {
+      const angle = (Math.PI * 2 * i) / count + Phaser.Math.FloatBetween(-0.4, 0.4);
+      const speed = Phaser.Math.FloatBetween(spread * 0.35, spread);
+      const sq = this.add.image(x, y, 'particle-sq');
+      sq.setTint(color);
+      sq.setDepth(9990);
+      this.tweens.add({
+        targets: sq,
+        x: x + Math.cos(angle) * speed,
+        y: y + Math.sin(angle) * speed - spread * 0.15,
+        alpha: 0,
+        scaleX: 0,
+        scaleY: 0,
+        duration: lifetime,
+        ease: 'Sine.easeOut',
+        onComplete: () => sq.destroy(),
+      });
+    }
+  }
+
+  private showDamageNumber(worldX: number, worldY: number, amount: number, isHeal: boolean): void {
+    const label = isHeal ? `+${amount}` : `-${amount}`;
+    const text = this.add.text(worldX, worldY, label, {
+      fontFamily: 'ui-monospace, monospace',
+      fontSize: '13px',
+      color: isHeal ? '#4ade80' : '#f87171',
+      stroke: '#000000',
+      strokeThickness: 3,
+      resolution: 2,
+    });
+    text.setOrigin(0.5, 1);
+    text.setDepth(9991);
+    this.tweens.add({
+      targets: text,
+      y: worldY - 42,
+      alpha: 0,
+      duration: 620,
+      ease: 'Sine.easeOut',
+      onComplete: () => text.destroy(),
+    });
+  }
+
+  private flashScreen(): void {
+    const cam = this.cameras.main;
+    const overlay = this.add.graphics();
+    overlay.fillStyle(0xffffff, 1);
+    overlay.fillRect(0, 0, cam.width, cam.height);
+    overlay.setScrollFactor(0);
+    overlay.setDepth(99998);
+    overlay.setAlpha(0.3);
+    this.tweens.add({
+      targets: overlay,
+      alpha: 0,
+      duration: 90,
+      onComplete: () => overlay.destroy(),
+    });
+  }
+
+  private triggerFreezeFrame(durationMs: number): void {
+    if (this.isFreezeFraming) return;
+    this.isFreezeFraming = true;
+    window.setTimeout(() => {
+      this.scene.resume();
+      this.isFreezeFraming = false;
+    }, durationMs);
+    this.scene.pause();
   }
 
   // ─── Inventory ────────────────────────────────────────────────────────────
@@ -588,9 +692,13 @@ export class MainScene extends Phaser.Scene {
       if (item.itemType === 'heart_pickup' && !item.isOpened()) {
         const dist = Phaser.Math.Distance.Between(item.x, item.y, this.player.x, this.player.y);
         if (dist < 22) {
+          const ix = item.x;
+          const iy = item.y;
           item.collect(() => {
             this.player.heal(HEART_HEAL_AMOUNT);
             this.addToInventory('heart');
+            this.spawnParticleBurst(ix, iy, 0x4ade80, 8, 42, 400);
+            this.showDamageNumber(ix, iy - 8, HEART_HEAL_AMOUNT, true);
           });
         }
       }
@@ -641,8 +749,13 @@ export class MainScene extends Phaser.Scene {
       this.activeChest.showInteractPrompt(true);
       this.player.setNearInteractable(true);
       if (this.player.wantsInteract()) {
+        const chestX = this.activeChest.x;
+        const chestY = this.activeChest.y;
         const reward = this.activeChest.openChest();
-        if (reward) this.applyChestReward(reward);
+        if (reward) {
+          this.applyChestReward(reward);
+          this.spawnParticleBurst(chestX, chestY, 0x4ade80, 10, 55, 480);
+        }
         this.activeChest = null;
       }
     } else {
@@ -699,5 +812,9 @@ export class MainScene extends Phaser.Scene {
     if (!this.isTransitioning && !this.player.isDialogActive()) {
       this.updateInteractions();
     }
+
+    // Ambient camera breathing — very slow sin-wave follow offset
+    this.ambientBreathTime += delta * 0.00055;
+    this.cameras.main.setFollowOffset(0, Math.sin(this.ambientBreathTime) * 1.2);
   }
 }

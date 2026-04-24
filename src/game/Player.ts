@@ -13,6 +13,8 @@ import {
   ATTACK_ZONE_WIDTH,
   ATTACK_ZONE_HEIGHT,
   ATTACK_OFFSET,
+  ZoneId,
+  ZONE_BOB_FREQ,
 } from './constants';
 
 export type Direction = 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw' | 'idle';
@@ -62,10 +64,12 @@ export class Player extends Phaser.GameObjects.Container {
   private dialogActive = false;
   private frozen = false;
 
+  private zoneBobMult = 1.0;
+
   constructor(scene: Phaser.Scene, x: number, y: number) {
     super(scene, x, y);
 
-    this.shadow = scene.add.image(0, 10, 'shadow').setAlpha(0.5);
+    this.shadow = scene.add.image(0, 10, 'shadow').setAlpha(0.55);
     this.sprite = scene.add.image(0, 0, 'player');
     this.directionIndicator = scene.add.graphics();
     this.dustParticles = scene.add.graphics();
@@ -221,6 +225,7 @@ export class Player extends Phaser.GameObjects.Container {
     body.enable = true;
     this.updateAttackZonePosition();
     this.drawSlashEffect();
+    this.spawnGhostTrail();
 
     this.scene.tweens.killTweensOf(this.sprite);
     this.scene.tweens.add({
@@ -236,6 +241,24 @@ export class Player extends Phaser.GameObjects.Container {
     });
 
     this.scene.game.events.emit(GAME_EVENTS.PLAYER_ATTACK, this.lastDirection);
+  }
+
+  private spawnGhostTrail(): void {
+    for (let i = 0; i < 3; i++) {
+      this.scene.time.delayedCall(i * 18, () => {
+        if (!this.active) return;
+        const ghost = this.scene.add.image(this.x, this.y + this.jumpOffset, 'player');
+        ghost.setAlpha(0.45 - i * 0.12);
+        ghost.setTint(0x93c5fd);
+        ghost.setDepth(this.depth - 0.1);
+        this.scene.tweens.add({
+          targets: ghost,
+          alpha: 0,
+          duration: 70,
+          onComplete: () => ghost.destroy(),
+        });
+      });
+    }
   }
 
   private endAttack(): void {
@@ -260,13 +283,15 @@ export class Player extends Phaser.GameObjects.Container {
     const cx = Math.cos(angle) * ATTACK_OFFSET;
     const cy = Math.sin(angle) * ATTACK_OFFSET;
 
-    this.slashGfx.lineStyle(3, 0xfef9c3, 0.9);
+    // Bright arc
+    this.slashGfx.lineStyle(4, 0xffffff, 1);
     this.slashGfx.beginPath();
-    this.slashGfx.arc(cx, cy, 12, angle - Math.PI * 0.4, angle + Math.PI * 0.4, false);
+    this.slashGfx.arc(cx, cy, 14, angle - Math.PI * 0.45, angle + Math.PI * 0.45, false);
     this.slashGfx.strokePath();
 
-    this.slashGfx.fillStyle(0xfef9c3, 0.35);
-    this.slashGfx.fillCircle(cx, cy, 10);
+    // Soft glow fill
+    this.slashGfx.fillStyle(0xfef9c3, 0.4);
+    this.slashGfx.fillCircle(cx, cy, 11);
 
     this.scene.tweens.add({
       targets: this.slashGfx,
@@ -313,23 +338,26 @@ export class Player extends Phaser.GameObjects.Container {
 
   private spawnLandDust(): void {
     this.dustParticles.clear();
-    this.dustParticles.fillStyle(0xcccccc, 0.6);
-    for (let i = 0; i < 4; i++) {
-      const angle = (Math.PI * 2 * i) / 4;
-      const dist = 8;
-      this.dustParticles.fillCircle(
-        Math.cos(angle) * dist, 10 + Math.sin(angle) * 3, 3
+    for (let i = 0; i < 6; i++) {
+      const angle = (Math.PI * 2 * i) / 6 + Phaser.Math.FloatBetween(-0.2, 0.2);
+      const dist = Phaser.Math.FloatBetween(6, 14);
+      this.dustParticles.fillStyle(0xd6d3d1, 0.75);
+      this.dustParticles.fillRect(
+        Math.cos(angle) * dist - 2,
+        10 + Math.sin(angle) * 4 - 2,
+        4, 4
       );
     }
-    this.scene.time.delayedCall(180, () => this.dustParticles.clear());
+    this.scene.time.delayedCall(200, () => this.dustParticles.clear());
   }
 
   private updateSpritePosition(): void {
     this.sprite.y = this.jumpOffset;
 
     const jumpProgress = Math.abs(this.jumpOffset) / JUMP_HEIGHT;
-    this.shadow.setScale(1 - jumpProgress * 0.4, 1 - jumpProgress * 0.35);
-    this.shadow.setAlpha(0.5 - jumpProgress * 0.25);
+    // More pronounced shadow — shrinks more and fades more during jump
+    this.shadow.setScale(1 - jumpProgress * 0.6, 1 - jumpProgress * 0.55);
+    this.shadow.setAlpha(0.55 - jumpProgress * 0.45);
 
     this.directionIndicator.y = this.jumpOffset;
   }
@@ -339,7 +367,7 @@ export class Player extends Phaser.GameObjects.Container {
     const moving = body.velocity.x !== 0 || body.velocity.y !== 0;
 
     if (moving && !this.isJumping && !this.isAttacking) {
-      this.stepBob += delta * 0.009;
+      this.stepBob += delta * 0.009 * this.zoneBobMult;
       this.sprite.y = this.jumpOffset + Math.sin(this.stepBob * Math.PI) * 1.5;
       this.directionIndicator.y = this.sprite.y;
     }
@@ -360,11 +388,17 @@ export class Player extends Phaser.GameObjects.Container {
     this.hp = Math.max(0, this.hp - amount);
     this.invincibleTimer = 1500;
     this.scene.game.events.emit(GAME_EVENTS.HP_CHANGE, this.hp);
+    this.scene.game.events.emit(GAME_EVENTS.PLAYER_DAMAGED, { x: this.x, y: this.y });
+    this.scene.cameras.main.shake(250, 0.008);
   }
 
   heal(amount: number): void {
     this.hp = Math.min(MAX_HP, this.hp + amount);
     this.scene.game.events.emit(GAME_EVENTS.HP_CHANGE, this.hp);
+  }
+
+  setZone(zone: ZoneId): void {
+    this.zoneBobMult = ZONE_BOB_FREQ[zone] ?? 1.0;
   }
 
   getHp(): number {

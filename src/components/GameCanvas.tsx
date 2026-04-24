@@ -74,6 +74,14 @@ export function GameCanvas() {
   return (
     <div className="relative w-full h-full">
       <div ref={containerRef} className="w-full h-full" />
+      {/* Vignette: dark radial gradient frames the scene */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background:
+            'radial-gradient(ellipse at center, transparent 38%, rgba(0,0,0,0.60) 100%)',
+        }}
+      />
       <HUD
         hp={hp}
         maxHp={MAX_HP}

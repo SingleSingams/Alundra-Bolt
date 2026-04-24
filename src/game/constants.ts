@@ -37,6 +37,7 @@ export const GAME_EVENTS = {
   PLAYER_JUMP: 'player-jump',
   PLAYER_LAND: 'player-land',
   PLAYER_ATTACK: 'player-attack',
+  PLAYER_DAMAGED: 'player-damaged',
   INVENTORY_CHANGE: 'inventory-change',
   CHEST_PROXIMITY: 'chest-proximity',
   ZONE_CHANGE: 'zone-change',
@@ -69,3 +70,9 @@ export interface DialogPayload {
   npcName: string;
   lines: string[];
 }
+
+export const ZONE_BOB_FREQ: Record<string, number> = {
+  grasslands: 1.0,
+  forest: 0.7,
+  dungeon: 1.35,
+};
