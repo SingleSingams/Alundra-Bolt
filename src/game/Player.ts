@@ -32,6 +32,7 @@ interface InputKeys {
   rightD: Phaser.Input.Keyboard.Key;
   spaceJump: Phaser.Input.Keyboard.Key;
   attackX: Phaser.Input.Keyboard.Key;
+  shootY: Phaser.Input.Keyboard.Key;
 }
 
 const DIRECTION_ANGLES: Record<FacingDirection, number> = {
@@ -60,9 +61,11 @@ export class Player extends Phaser.GameObjects.Container {
   private isAttacking = false;
   private attackCooldown = 0;
   private attackTimer = 0;
+  private shootCooldown = 0;
   private nearChest = false;
   private dialogActive = false;
   private frozen = false;
+  private shieldCharges = 0;
 
   private zoneBobMult = 1.0;
 
@@ -70,6 +73,7 @@ export class Player extends Phaser.GameObjects.Container {
   // so we read it exactly once per key per frame and share the result.
   private jumpPressedThisFrame = false;
   private attackPressedThisFrame = false;
+  private shootPressedThisFrame = false;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     super(scene, x, y);
@@ -116,6 +120,7 @@ export class Player extends Phaser.GameObjects.Container {
       rightD: kb.addKey(Phaser.Input.Keyboard.KeyCodes.D),
       spaceJump: kb.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE),
       attackX: kb.addKey(Phaser.Input.Keyboard.KeyCodes.X),
+      shootY: kb.addKey(Phaser.Input.Keyboard.KeyCodes.Y),
     };
   }
 
@@ -142,6 +147,7 @@ export class Player extends Phaser.GameObjects.Container {
       Phaser.Input.Keyboard.JustDown(this.keys.jumpZ) ||
       Phaser.Input.Keyboard.JustDown(this.keys.spaceJump);
     this.attackPressedThisFrame = Phaser.Input.Keyboard.JustDown(this.keys.attackX);
+    this.shootPressedThisFrame = Phaser.Input.Keyboard.JustDown(this.keys.shootY);
 
     if (this.dialogActive || this.frozen) {
       const body = this.body as Phaser.Physics.Arcade.Body;
@@ -154,6 +160,7 @@ export class Player extends Phaser.GameObjects.Container {
     this.handleMovement();
     this.handleJump();
     this.handleAttack(delta);
+    if (this.shootCooldown > 0) this.shootCooldown = Math.max(0, this.shootCooldown - delta);
     this.updateSpritePosition();
     this.updateInvincibility(delta);
     this.updateBob(delta);
@@ -389,8 +396,15 @@ export class Player extends Phaser.GameObjects.Container {
     }
   }
 
-  takeDamage(amount: number): void {
+  takeDamage(rawAmount: number): void {
     if (this.invincibleTimer > 0) return;
+    let amount = rawAmount;
+    if (this.shieldCharges > 0) {
+      this.shieldCharges--;
+      this.scene.game.events.emit(GAME_EVENTS.SHIELD_BLOCK, { x: this.x, y: this.y });
+      this.invincibleTimer = 700;
+      return;
+    }
     this.hp = Math.max(0, this.hp - amount);
     this.invincibleTimer = 1500;
     this.scene.game.events.emit(GAME_EVENTS.HP_CHANGE, this.hp);
@@ -400,6 +414,18 @@ export class Player extends Phaser.GameObjects.Container {
       this.frozen = true;
       this.scene.game.events.emit(GAME_EVENTS.GAME_OVER);
     }
+  }
+
+  addShield(): void {
+    this.shieldCharges++;
+  }
+
+  wantsShoot(): boolean {
+    return !this.dialogActive && !this.frozen && this.shootPressedThisFrame && this.shootCooldown <= 0;
+  }
+
+  markShot(): void {
+    this.shootCooldown = 450;
   }
 
   heal(amount: number): void {

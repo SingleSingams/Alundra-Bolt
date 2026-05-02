@@ -23,6 +23,7 @@ export const ATTACK_ZONE_WIDTH = 34;
 export const ATTACK_ZONE_HEIGHT = 26;
 export const ATTACK_OFFSET = 18;
 export const ATTACK_DAMAGE = 2;
+export const PROJECTILE_DAMAGE = 1;
 
 export const ENEMY_MAX_HP = 4;
 export const ENEMY_HIT_INVULN_MS = 240;
@@ -45,9 +46,10 @@ export const GAME_EVENTS = {
   DIALOG_CLOSE: 'dialog-close',
   SAVE_LOADED: 'save-loaded',
   GAME_OVER: 'game-over',
+  SHIELD_BLOCK: 'shield-block',
 } as const;
 
-export type InventoryItem = 'heart' | 'sword_upgrade';
+export type InventoryItem = 'heart' | 'sword_upgrade' | 'potion' | 'shield_fragment';
 
 export type ZoneId = 'grasslands' | 'forest' | 'dungeon' | 'dungeon_interior' | 'boss_room';
 

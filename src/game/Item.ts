@@ -1,7 +1,7 @@
 import * as Phaser from 'phaser';
 import { InventoryItem } from './constants';
 
-export type WorldItemType = 'chest' | 'heart_pickup';
+export type WorldItemType = 'chest' | 'heart_pickup' | 'potion_pickup';
 
 export class Item extends Phaser.GameObjects.Container {
   public readonly itemType: WorldItemType;
@@ -20,7 +20,7 @@ export class Item extends Phaser.GameObjects.Container {
 
     this.shadow = scene.add.image(0, 9, 'shadow').setAlpha(0.35).setScale(0.7);
 
-    const textureKey = type === 'chest' ? 'chest-closed' : 'heart-pickup';
+    const textureKey = type === 'chest' ? 'chest-closed' : type === 'potion_pickup' ? 'potion-pickup' : 'heart-pickup';
     this.sprite = scene.add.image(0, 0, textureKey);
 
     this.promptGfx = scene.add.graphics();
@@ -39,6 +39,7 @@ export class Item extends Phaser.GameObjects.Container {
       body.setOffset(-8, -8);
     }
     body.setImmovable(type === 'chest');
+    body.setAllowGravity(false);
   }
 
   static ensureTextures(scene: Phaser.Scene): void {
@@ -104,6 +105,27 @@ export class Item extends Phaser.GameObjects.Container {
       gfx.generateTexture('heart-pickup', 20, 20);
       gfx.destroy();
     }
+
+    if (!scene.textures.exists('potion-pickup')) {
+      const gfx = scene.add.graphics();
+      // Flask body
+      gfx.fillStyle(0x14532d, 1);
+      gfx.fillRect(7, 10, 8, 10);
+      gfx.fillStyle(0x16a34a, 1);
+      gfx.fillEllipse(11, 16, 10, 10);
+      // Liquid shine
+      gfx.fillStyle(0x4ade80, 1);
+      gfx.fillEllipse(10, 15, 7, 7);
+      gfx.fillStyle(0xbbf7d0, 0.6);
+      gfx.fillEllipse(9, 13, 3, 2);
+      // Neck & cork
+      gfx.fillStyle(0x166534, 1);
+      gfx.fillRect(9, 5, 4, 6);
+      gfx.fillStyle(0x92400e, 1);
+      gfx.fillRect(8, 3, 6, 3);
+      gfx.generateTexture('potion-pickup', 22, 22);
+      gfx.destroy();
+    }
   }
 
   update(delta: number): void {
@@ -155,7 +177,11 @@ export class Item extends Phaser.GameObjects.Container {
       ease: 'Sine.easeOut',
     });
 
-    return Math.random() < 0.5 ? 'heart' : 'sword_upgrade';
+    const r = Math.random();
+    if (r < 0.30) return 'heart';
+    if (r < 0.55) return 'potion';
+    if (r < 0.78) return 'shield_fragment';
+    return 'sword_upgrade';
   }
 
   /** Marks a pickup as collected and removes it with a small tween. */

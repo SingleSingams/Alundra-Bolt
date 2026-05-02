@@ -19,6 +19,7 @@ import {
   CAMERA_LERP,
   GAME_EVENTS,
   ATTACK_DAMAGE,
+  PROJECTILE_DAMAGE,
   CHEST_DROP_CHANCE,
   CHEST_INTERACT_RADIUS,
   HEART_HEAL_AMOUNT,
@@ -32,9 +33,14 @@ import {
 } from './constants';
 import { SaveSystem } from './SaveSystem';
 import { Boss } from './Boss';
+import { Projectile } from './Projectile';
 
 const TREE_POSITIONS: Array<{ x: number; y: number }> = [];
 const SPAWN_SAFE_TILES = 6;
+const DIRECTION_ANGLES: Record<string, number> = {
+  n: -90, ne: -45, e: 0, se: 45,
+  s: 90, sw: 135, w: 180, nw: -135,
+};
 const NPC_INTERACT_RADIUS = 42;
 const TRANSITION_ZONE_THICKNESS = TRANSITION_EDGE_TILES * TILE_SIZE;
 
@@ -204,6 +210,7 @@ export class MainScene extends Phaser.Scene {
   private ambientBreathTime = 0;
   private currentAttackDamage = ATTACK_DAMAGE;
   private boss: Boss | null = null;
+  private projectiles: Projectile[] = [];
 
   constructor() {
     super({ key: 'MainScene' });
@@ -214,6 +221,7 @@ export class MainScene extends Phaser.Scene {
     createPlayerTexture(this);
     createShadowTexture(this);
     createHeartTexture(this);
+    Projectile.ensureTexture(this);
   }
 
   create(): void {
@@ -253,10 +261,13 @@ export class MainScene extends Phaser.Scene {
     this.game.events.on(GAME_EVENTS.DIALOG_CLOSE, this.handleDialogClose, this);
     // Player damage → particles via game event
     this.game.events.on(GAME_EVENTS.PLAYER_DAMAGED, this.onPlayerDamaged, this);
+    // Shield block → blue spark effect
+    this.game.events.on(GAME_EVENTS.SHIELD_BLOCK, this.onShieldBlock, this);
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off(GAME_EVENTS.DIALOG_CLOSE, this.handleDialogClose, this);
       this.game.events.off(GAME_EVENTS.PLAYER_DAMAGED, this.onPlayerDamaged, this);
+      this.game.events.off(GAME_EVENTS.SHIELD_BLOCK, this.onShieldBlock, this);
     });
   }
 
@@ -490,6 +501,9 @@ export class MainScene extends Phaser.Scene {
       this.boss = null;
     }
 
+    for (const proj of this.projectiles) if (proj.active) proj.destroy();
+    this.projectiles.length = 0;
+
     for (const enemy of this.enemies) enemy.destroy();
     this.enemies.length = 0;
 
@@ -593,6 +607,23 @@ export class MainScene extends Phaser.Scene {
           this.spawnParticleBurst(this.boss.x, this.boss.y, 0xef4444, 7, 50, 320);
           this.showDamageNumber(this.boss.x, this.boss.y - 22, this.currentAttackDamage, false);
           this.triggerFreezeFrame(50);
+        }
+      }
+    );
+
+    // Projectile ↔ boss
+    this.physics.add.overlap(
+      this.projectiles as unknown as Phaser.GameObjects.GameObject[],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      this.boss as any,
+      (projObj) => {
+        const proj = projObj as Projectile;
+        if (proj.isSpent() || !this.boss?.canBeHit()) return;
+        proj.hit();
+        const died = this.boss.takeDamage(PROJECTILE_DAMAGE, (bx, by) => this.onBossDeath(bx, by));
+        if (!died) {
+          this.spawnParticleBurst(this.boss.x, this.boss.y, 0xfbbf24, 5, 40, 280);
+          this.showDamageNumber(this.boss.x, this.boss.y - 22, PROJECTILE_DAMAGE, false);
         }
       }
     );
@@ -710,6 +741,23 @@ export class MainScene extends Phaser.Scene {
       undefined,
       this
     );
+
+    // Projectile ↔ enemy overlap (uses live array reference)
+    this.physics.add.overlap(
+      this.projectiles as unknown as Phaser.GameObjects.GameObject[],
+      this.enemies as unknown as Phaser.GameObjects.GameObject[],
+      (projObj, enemyObj) => {
+        const proj = projObj as Projectile;
+        const enemy = enemyObj as Enemy;
+        if (proj.isSpent() || !enemy.canBeHit()) return;
+        proj.hit();
+        enemy.takeDamage(PROJECTILE_DAMAGE, (ex, ey) => this.onEnemyDeath(ex, ey));
+        this.spawnParticleBurst(enemy.x, enemy.y, 0xfbbf24, 5, 40, 280);
+        this.showDamageNumber(enemy.x, enemy.y - 10, PROJECTILE_DAMAGE, false);
+      },
+      undefined,
+      this
+    );
   }
 
   private onEnemyDeath(x: number, y: number): void {
@@ -732,6 +780,13 @@ export class MainScene extends Phaser.Scene {
     if (this.player.getHp() > 0) {
       this.saveCurrentState();
     }
+  }
+
+  private onShieldBlock(pos: { x: number; y: number }): void {
+    this.spawnParticleBurst(pos.x, pos.y, 0x60a5fa, 10, 45, 320);
+    this.spawnParticleBurst(pos.x, pos.y, 0xbfdbfe, 6, 28, 240);
+    this.showDamageNumber(pos.x, pos.y - 10, 0, true);
+    this.cameras.main.shake(80, 0.003);
   }
 
   // ─── Juice helpers ────────────────────────────────────────────────────────
@@ -849,18 +904,20 @@ export class MainScene extends Phaser.Scene {
     this.items = this.items.filter((item) => item.active);
     this.npcs = this.npcs.filter((n) => n.active);
 
-    // Auto-collect heart pickups
+    // Auto-collect heart and potion pickups
     for (const item of this.items) {
-      if (item.itemType === 'heart_pickup' && !item.isOpened()) {
+      if ((item.itemType === 'heart_pickup' || item.itemType === 'potion_pickup') && !item.isOpened()) {
         const dist = Phaser.Math.Distance.Between(item.x, item.y, this.player.x, this.player.y);
         if (dist < 22) {
           const ix = item.x;
           const iy = item.y;
+          const isPotion = item.itemType === 'potion_pickup';
+          const healAmt = isPotion ? 4 : HEART_HEAL_AMOUNT;
           item.collect(() => {
-            this.player.heal(HEART_HEAL_AMOUNT);
-            this.addToInventory('heart');
-            this.spawnParticleBurst(ix, iy, 0x4ade80, 8, 42, 400);
-            this.showDamageNumber(ix, iy - 8, HEART_HEAL_AMOUNT, true);
+            this.player.heal(healAmt);
+            this.addToInventory(isPotion ? 'potion' : 'heart');
+            this.spawnParticleBurst(ix, iy, isPotion ? 0x4ade80 : 0x4ade80, 8, 42, 400);
+            this.showDamageNumber(ix, iy - 8, healAmt, true);
           });
         }
       }
@@ -937,6 +994,8 @@ export class MainScene extends Phaser.Scene {
 
   private applyChestReward(reward: InventoryItem): void {
     if (reward === 'heart') this.player.heal(HEART_HEAL_AMOUNT);
+    if (reward === 'potion') this.player.heal(4);
+    if (reward === 'shield_fragment') this.player.addShield();
     this.addToInventory(reward);
   }
 
@@ -973,6 +1032,20 @@ export class MainScene extends Phaser.Scene {
 
     if (this.boss?.active) {
       this.boss.update(this.player.x, this.player.y, delta);
+    }
+
+    // Update and prune projectiles
+    this.projectiles = this.projectiles.filter(p => p.active);
+    for (const proj of this.projectiles) {
+      proj.update(delta);
+    }
+
+    // Ranged attack: Y key
+    if (this.player.wantsShoot()) {
+      const angle = DIRECTION_ANGLES[this.player.getLastDirection()] ?? 0;
+      const proj = new Projectile(this, this.player.x, this.player.y, angle);
+      this.projectiles.push(proj);
+      this.player.markShot();
     }
 
     if (!this.isTransitioning && !this.player.isDialogActive()) {

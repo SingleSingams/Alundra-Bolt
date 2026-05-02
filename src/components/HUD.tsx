@@ -139,27 +139,41 @@ function SwordIcon() {
         strokeWidth="0.8"
         strokeLinejoin="round"
       />
-      <rect
-        x="3.5"
-        y="15"
-        width="6"
-        height="2"
-        transform="rotate(-45, 6.5, 16)"
-        fill="#78350f"
-        stroke="#451a03"
-        strokeWidth="0.6"
-      />
-      <rect
-        x="2"
-        y="19"
-        width="4"
-        height="2"
-        transform="rotate(-45, 4, 20)"
-        fill="#1e293b"
-        stroke="#0f172a"
-        strokeWidth="0.6"
-      />
+      <rect x="3.5" y="15" width="6" height="2" transform="rotate(-45, 6.5, 16)"
+        fill="#78350f" stroke="#451a03" strokeWidth="0.6" />
+      <rect x="2" y="19" width="4" height="2" transform="rotate(-45, 4, 20)"
+        fill="#1e293b" stroke="#0f172a" strokeWidth="0.6" />
       <circle cx="3" cy="21" r="1.3" fill="#eab308" stroke="#854d0e" strokeWidth="0.5" />
+    </svg>
+  );
+}
+
+function PotionIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" className="drop-shadow">
+      <rect x="10" y="4" width="4" height="5" fill="#166534" rx="1" />
+      <rect x="9" y="3" width="6" height="3" fill="#92400e" rx="1" />
+      <ellipse cx="12" cy="16" rx="6" ry="6" fill="#16a34a" />
+      <ellipse cx="12" cy="15" rx="4" ry="4" fill="#4ade80" />
+      <ellipse cx="10.5" cy="13" rx="1.5" ry="1" fill="#bbf7d0" opacity="0.7" />
+    </svg>
+  );
+}
+
+function ShieldIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" className="drop-shadow">
+      <path
+        d="M12 3 L20 6 L20 13 C20 17.5 16 21 12 22 C8 21 4 17.5 4 13 L4 6 Z"
+        fill="#1d4ed8"
+        stroke="#1e40af"
+        strokeWidth="1"
+      />
+      <path
+        d="M12 5 L18 7.5 L18 13 C18 16.5 15 19.5 12 20.5 C9 19.5 6 16.5 6 13 L6 7.5 Z"
+        fill="#3b82f6"
+      />
+      <path d="M12 8 L12 17 M9 12.5 L15 12.5" stroke="#bfdbfe" strokeWidth="1.5" strokeLinecap="round" />
     </svg>
   );
 }
@@ -183,7 +197,10 @@ function InventorySlot({ item, index }: InventorySlotProps) {
     >
       {hasItem ? (
         <div className="animate-in fade-in zoom-in duration-200">
-          {item === 'heart' ? <HeartIcon /> : <SwordIcon />}
+          {item === 'heart' ? <HeartIcon /> :
+           item === 'potion' ? <PotionIcon /> :
+           item === 'shield_fragment' ? <ShieldIcon /> :
+           <SwordIcon />}
         </div>
       ) : (
         <span className="text-[9px] text-stone-600 font-mono font-bold">{index + 1}</span>
@@ -365,6 +382,7 @@ export function HUD({ hp, maxHp, isJumping, inventory, zone }: HUDProps) {
           <ControlBadge keys={['W', 'A', 'S', 'D']} label="Move" />
           <ControlBadge keys={['Z', 'Spc']} label="Jump / Open" />
           <ControlBadge keys={['X']} label="Attack" />
+          <ControlBadge keys={['Y']} label="Ranged" />
         </div>
       </div>
     </>
