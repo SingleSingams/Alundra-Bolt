@@ -1,6 +1,7 @@
 import { GameCanvas } from './components/GameCanvas';
 import { Badge } from './components/ui/badge';
 import { Separator } from './components/ui/separator';
+import { SaveSystem } from './game/SaveSystem';
 
 function TitleBar() {
   return (
@@ -34,6 +35,18 @@ function TitleBar() {
         <Badge variant="outline" className="text-amber-400 border-amber-800 bg-amber-950/50 text-[10px] px-2">
           Phaser 3
         </Badge>
+        <Separator orientation="vertical" className="h-4 bg-stone-700" />
+        <button
+          onClick={() => {
+            if (window.confirm('Spielstand löschen und neu starten?')) {
+              SaveSystem.clear();
+              window.location.reload();
+            }
+          }}
+          className="text-[10px] font-mono text-stone-400 hover:text-red-400 transition-colors px-1"
+        >
+          Neues Spiel
+        </button>
       </div>
     </header>
   );

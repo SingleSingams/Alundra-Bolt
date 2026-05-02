@@ -49,7 +49,7 @@ export const GAME_EVENTS = {
 
 export type InventoryItem = 'heart' | 'sword_upgrade';
 
-export type ZoneId = 'grasslands' | 'forest' | 'dungeon';
+export type ZoneId = 'grasslands' | 'forest' | 'dungeon' | 'dungeon_interior' | 'boss_room';
 
 export interface ZoneMeta {
   id: ZoneId;
@@ -58,12 +58,14 @@ export interface ZoneMeta {
 }
 
 export const ZONES: Record<ZoneId, ZoneMeta> = {
-  grasslands: { id: 'grasslands', name: 'Grasslands', tint: 0xffffff },
-  forest: { id: 'forest', name: 'Forest', tint: 0x78a878 },
-  dungeon: { id: 'dungeon', name: 'Dungeon Entrance', tint: 0x8a8a8a },
+  grasslands:        { id: 'grasslands',        name: 'Grasslands',       tint: 0xffffff },
+  forest:            { id: 'forest',            name: 'Forest',           tint: 0x78a878 },
+  dungeon:           { id: 'dungeon',           name: 'Dungeon Entrance', tint: 0x8a8a8a },
+  dungeon_interior:  { id: 'dungeon_interior',  name: 'Dungeon Interior', tint: 0x606880 },
+  boss_room:         { id: 'boss_room',         name: 'Boss Chamber',     tint: 0x5a2850 },
 };
 
-export const ZONE_ORDER: ZoneId[] = ['grasslands', 'forest', 'dungeon'];
+export const ZONE_ORDER: ZoneId[] = ['grasslands', 'forest', 'dungeon', 'dungeon_interior', 'boss_room'];
 
 export const TRANSITION_FADE_MS = 500;
 export const TRANSITION_EDGE_TILES = 2;
@@ -74,7 +76,9 @@ export interface DialogPayload {
 }
 
 export const ZONE_BOB_FREQ: Record<string, number> = {
-  grasslands: 1.0,
-  forest: 0.7,
-  dungeon: 1.35,
+  grasslands:       1.0,
+  forest:           0.7,
+  dungeon:          1.35,
+  dungeon_interior: 1.6,
+  boss_room:        1.9,
 };
