@@ -31,6 +31,7 @@ import {
   DialogPayload,
 } from './constants';
 import { SaveSystem } from './SaveSystem';
+import { Boss } from './Boss';
 
 const TREE_POSITIONS: Array<{ x: number; y: number }> = [];
 const SPAWN_SAFE_TILES = 6;
@@ -46,6 +47,7 @@ interface ZoneConfig {
   heartSpawns: Array<{ tx: number; ty: number }>;
   npcs: NPCDefinition[];
   transitions: Partial<Record<EdgeDirection, ZoneId>>;
+  bossSpawn?: { tx: number; ty: number };
 }
 
 const centerX = WORLD_WIDTH / 2;
@@ -106,7 +108,19 @@ const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
       { tx: 30, ty: 30 },
       { tx: 42, ty: 16 },
     ],
-    npcs: [],
+    npcs: [
+      {
+        id: 'theron',
+        name: 'Theron the Wanderer',
+        x: centerX - 120,
+        y: centerY + 80,
+        lines: [
+          'These woods have grown dark of late... the shadows stir with something ancient.',
+          'I\'ve heard screams from beyond the dungeon gates. Turn back while you still can.',
+          'If you insist — find every sword upgrade you can. You will need the edge.',
+        ],
+      },
+    ],
     transitions: { west: 'grasslands', east: 'dungeon' },
   },
   dungeon: {
@@ -122,7 +136,19 @@ const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
       { tx: 14, ty: 30, axis: 'x' },
     ],
     heartSpawns: [{ tx: 30, ty: 46 }],
-    npcs: [],
+    npcs: [
+      {
+        id: 'arwen',
+        name: 'Arwen, Fallen Scout',
+        x: centerX + 80,
+        y: centerY - 80,
+        lines: [
+          '...heed my warning... I ventured within and barely escaped with my life.',
+          'Beyond this gate lies a labyrinth — and deeper within, something terrible awaits.',
+          'The Void Tyrant... ancient, relentless. Survive the interior first. Then face your fate.',
+        ],
+      },
+    ],
     transitions: { west: 'forest', east: 'dungeon_interior' },
   },
   dungeon_interior: {
@@ -144,21 +170,16 @@ const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
   },
   boss_room: {
     numTrees: 0,
-    obstacleDensity: 0.12,
+    obstacleDensity: 0.08,
     enemySpawns: [
-      { tx: 16, ty: 16, axis: 'x' },
-      { tx: 44, ty: 16, axis: 'y' },
-      { tx: 16, ty: 44, axis: 'y' },
-      { tx: 44, ty: 44, axis: 'x' },
-      { tx: 30, ty: 14, axis: 'x' },
-      { tx: 14, ty: 30, axis: 'y' },
-      { tx: 46, ty: 30, axis: 'x' },
-      { tx: 30, ty: 46, axis: 'y' },
-      { tx: 22, ty: 22, axis: 'x' },
-      { tx: 38, ty: 38, axis: 'y' },
+      { tx: 14, ty: 14, axis: 'x' },
+      { tx: 46, ty: 14, axis: 'y' },
+      { tx: 14, ty: 46, axis: 'y' },
+      { tx: 46, ty: 46, axis: 'x' },
     ],
     heartSpawns: [],
     npcs: [],
+    bossSpawn: { tx: 30, ty: 30 },
     transitions: { west: 'dungeon_interior' },
   },
 };
@@ -182,6 +203,7 @@ export class MainScene extends Phaser.Scene {
   private isFreezeFraming = false;
   private ambientBreathTime = 0;
   private currentAttackDamage = ATTACK_DAMAGE;
+  private boss: Boss | null = null;
 
   constructor() {
     super({ key: 'MainScene' });
@@ -443,6 +465,9 @@ export class MainScene extends Phaser.Scene {
     this.spawnEnemies(config.enemySpawns);
     this.spawnInitialItems(config.heartSpawns);
     this.spawnNPCs(config.npcs);
+    if (config.bossSpawn) {
+      this.spawnBoss(config.bossSpawn.tx, config.bossSpawn.ty);
+    }
     this.createTransitionZones(config.transitions);
 
     if (enteredFrom === 'east') {
@@ -460,6 +485,11 @@ export class MainScene extends Phaser.Scene {
   }
 
   private clearZoneContent(): void {
+    if (this.boss) {
+      this.boss.destroy();
+      this.boss = null;
+    }
+
     for (const enemy of this.enemies) enemy.destroy();
     this.enemies.length = 0;
 
@@ -523,6 +553,69 @@ export class MainScene extends Phaser.Scene {
       this.npcs.push(npc);
       this.physics.add.collider(this.player, npc as unknown as Phaser.GameObjects.GameObject);
     }
+  }
+
+  // ─── Boss ─────────────────────────────────────────────────────────────────
+
+  private spawnBoss(tx: number, ty: number): void {
+    const px = tx * TILE_SIZE + TILE_SIZE / 2;
+    const py = ty * TILE_SIZE + TILE_SIZE / 2;
+    this.boss = new Boss(this, px, py);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    this.physics.add.collider(this.boss as any, this.obstacles);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    this.physics.add.collider(this.boss as any, this.treeObstacles);
+
+    this.physics.add.overlap(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      this.player as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      this.boss as any,
+      () => {
+        if (!this.boss || this.boss.isDying()) return;
+        this.player.takeDamage(2);
+      }
+    );
+
+    this.physics.add.overlap(
+      this.player.getAttackZone(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      this.boss as any,
+      () => {
+        if (!this.boss || !this.boss.canBeHit()) return;
+        const died = this.boss.takeDamage(
+          this.currentAttackDamage,
+          (bx, by) => this.onBossDeath(bx, by)
+        );
+        if (!died) {
+          this.cameras.main.shake(120, 0.004);
+          this.spawnParticleBurst(this.boss.x, this.boss.y, 0xef4444, 7, 50, 320);
+          this.showDamageNumber(this.boss.x, this.boss.y - 22, this.currentAttackDamage, false);
+          this.triggerFreezeFrame(50);
+        }
+      }
+    );
+
+    this.game.events.once('boss-phase-2', (pos: { x: number; y: number }) => {
+      this.cameras.main.shake(450, 0.018);
+      this.spawnParticleBurst(pos.x, pos.y, 0x9333ea, 22, 95, 650);
+      this.spawnParticleBurst(pos.x, pos.y, 0xec4899, 16, 70, 500);
+      this.flashScreen();
+    });
+  }
+
+  private onBossDeath(x: number, y: number): void {
+    this.boss = null;
+    this.cameras.main.shake(500, 0.022);
+    this.spawnParticleBurst(x, y, 0xef4444, 24, 110, 700);
+    this.spawnParticleBurst(x, y, 0xfbbf24, 18, 85, 580);
+    this.spawnParticleBurst(x, y, 0x9333ea, 14, 65, 450);
+    this.flashScreen();
+    // Guaranteed heart drops
+    this.spawnWorldItem(x - 24, y, 'heart_pickup');
+    this.spawnWorldItem(x + 24, y, 'heart_pickup');
+    this.spawnWorldItem(x, y - 24, 'heart_pickup');
   }
 
   // ─── Transitions ──────────────────────────────────────────────────────────
@@ -876,6 +969,10 @@ export class MainScene extends Phaser.Scene {
 
     for (const npc of this.npcs) {
       if (npc.active) npc.update(delta);
+    }
+
+    if (this.boss?.active) {
+      this.boss.update(this.player.x, this.player.y, delta);
     }
 
     if (!this.isTransitioning && !this.player.isDialogActive()) {
