@@ -396,6 +396,10 @@ export class Player extends Phaser.GameObjects.Container {
     this.scene.game.events.emit(GAME_EVENTS.HP_CHANGE, this.hp);
     this.scene.game.events.emit(GAME_EVENTS.PLAYER_DAMAGED, { x: this.x, y: this.y });
     this.scene.cameras.main.shake(250, 0.008);
+    if (this.hp <= 0) {
+      this.frozen = true;
+      this.scene.game.events.emit(GAME_EVENTS.GAME_OVER);
+    }
   }
 
   heal(amount: number): void {

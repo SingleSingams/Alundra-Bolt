@@ -44,6 +44,7 @@ export const GAME_EVENTS = {
   DIALOG_OPEN: 'dialog-open',
   DIALOG_CLOSE: 'dialog-close',
   SAVE_LOADED: 'save-loaded',
+  GAME_OVER: 'game-over',
 } as const;
 
 export type InventoryItem = 'heart' | 'sword_upgrade';

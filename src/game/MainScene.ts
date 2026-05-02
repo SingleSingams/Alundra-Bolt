@@ -145,6 +145,7 @@ export class MainScene extends Phaser.Scene {
   private isTransitioning = false;
   private isFreezeFraming = false;
   private ambientBreathTime = 0;
+  private currentAttackDamage = ATTACK_DAMAGE;
 
   constructor() {
     super({ key: 'MainScene' });
@@ -182,6 +183,7 @@ export class MainScene extends Phaser.Scene {
     if (save) {
       this.player.setHp(save.hp);
       this.inventory = save.inventory.slice(0, MAX_INVENTORY);
+      this.recalculateAttackDamage();
       this.emitInventoryChange();
       this.game.events.emit(GAME_EVENTS.SAVE_LOADED);
     } else {
@@ -569,11 +571,11 @@ export class MainScene extends Phaser.Scene {
       (_zone, enemyObj) => {
         const enemy = enemyObj as Enemy;
         if (!enemy.canBeHit()) return;
-        enemy.takeDamage(ATTACK_DAMAGE, (ex, ey) => this.onEnemyDeath(ex, ey));
+        enemy.takeDamage(this.currentAttackDamage, (ex, ey) => this.onEnemyDeath(ex, ey));
 
         this.cameras.main.shake(120, 0.004);
         this.spawnParticleBurst(enemy.x, enemy.y, 0xef4444, 7, 50, 320);
-        this.showDamageNumber(enemy.x, enemy.y - 10, ATTACK_DAMAGE, false);
+        this.showDamageNumber(enemy.x, enemy.y - 10, this.currentAttackDamage, false);
         this.triggerFreezeFrame(50);
       },
       undefined,
@@ -598,7 +600,9 @@ export class MainScene extends Phaser.Scene {
     this.spawnParticleBurst(pos.x, pos.y, 0xffffff, 8, 55, 350);
     this.spawnParticleBurst(pos.x, pos.y, 0xfde68a, 5, 35, 280);
     this.showDamageNumber(pos.x, pos.y - 10, 2, false);
-    this.saveCurrentState();
+    if (this.player.getHp() > 0) {
+      this.saveCurrentState();
+    }
   }
 
   // ─── Juice helpers ────────────────────────────────────────────────────────
@@ -696,8 +700,14 @@ export class MainScene extends Phaser.Scene {
     if (this.inventory.length > MAX_INVENTORY) {
       this.inventory = this.inventory.slice(this.inventory.length - MAX_INVENTORY);
     }
+    this.recalculateAttackDamage();
     this.emitInventoryChange();
     this.saveCurrentState();
+  }
+
+  private recalculateAttackDamage(): void {
+    const upgrades = this.inventory.filter(i => i === 'sword_upgrade').length;
+    this.currentAttackDamage = ATTACK_DAMAGE + upgrades * 2;
   }
 
   private emitInventoryChange(): void {

@@ -10,6 +10,7 @@ import {
 } from '../game/constants';
 import { HUD } from './HUD';
 import { DialogBox } from './DialogBox';
+import { GameOverScreen } from './GameOverScreen';
 
 export function GameCanvas() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -20,6 +21,7 @@ export function GameCanvas() {
   const [zone, setZone] = useState<ZoneId>('grasslands');
   const [dialog, setDialog] = useState<DialogPayload | null>(null);
   const [saveNotice, setSaveNotice] = useState(false);
+  const [gameOver, setGameOver] = useState(false);
 
   const handleHpChange = useCallback((newHp: number) => setHp(newHp), []);
   const handleJump = useCallback(() => setIsJumping(true), []);
@@ -37,6 +39,7 @@ export function GameCanvas() {
     setSaveNotice(true);
     setTimeout(() => setSaveNotice(false), 2500);
   }, []);
+  const handleGameOver = useCallback(() => setGameOver(true), []);
 
   const closeDialog = useCallback(() => {
     setDialog(null);
@@ -57,6 +60,7 @@ export function GameCanvas() {
     game.events.on(GAME_EVENTS.ZONE_CHANGE, handleZoneChange);
     game.events.on(GAME_EVENTS.DIALOG_OPEN, handleDialogOpen);
     game.events.on(GAME_EVENTS.SAVE_LOADED, handleSaveLoaded);
+    game.events.on(GAME_EVENTS.GAME_OVER, handleGameOver);
 
     return () => {
       game.events.off(GAME_EVENTS.HP_CHANGE, handleHpChange);
@@ -66,6 +70,7 @@ export function GameCanvas() {
       game.events.off(GAME_EVENTS.ZONE_CHANGE, handleZoneChange);
       game.events.off(GAME_EVENTS.DIALOG_OPEN, handleDialogOpen);
       game.events.off(GAME_EVENTS.SAVE_LOADED, handleSaveLoaded);
+      game.events.off(GAME_EVENTS.GAME_OVER, handleGameOver);
       game.destroy(true);
       gameRef.current = null;
     };
@@ -77,6 +82,7 @@ export function GameCanvas() {
     handleZoneChange,
     handleDialogOpen,
     handleSaveLoaded,
+    handleGameOver,
   ]);
 
   return (
@@ -110,6 +116,7 @@ export function GameCanvas() {
         lines={dialog?.lines ?? []}
         onClose={closeDialog}
       />
+      <GameOverScreen isOpen={gameOver} />
     </div>
   );
 }
