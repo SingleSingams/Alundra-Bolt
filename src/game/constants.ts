@@ -43,6 +43,7 @@ export const GAME_EVENTS = {
   ZONE_CHANGE: 'zone-change',
   DIALOG_OPEN: 'dialog-open',
   DIALOG_CLOSE: 'dialog-close',
+  SAVE_LOADED: 'save-loaded',
 } as const;
 
 export type InventoryItem = 'heart' | 'sword_upgrade';

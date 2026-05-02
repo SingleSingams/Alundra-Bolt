@@ -30,6 +30,7 @@ import {
   TRANSITION_EDGE_TILES,
   DialogPayload,
 } from './constants';
+import { SaveSystem } from './SaveSystem';
 
 const TREE_POSITIONS: Array<{ x: number; y: number }> = [];
 const SPAWN_SAFE_TILES = 6;
@@ -172,13 +173,21 @@ export class MainScene extends Phaser.Scene {
     this.player = new Player(this, centerX, centerY);
     this.setupPersistentColliders();
 
-    this.loadZone('grasslands', null);
+    const save = SaveSystem.load();
+    this.loadZone(save?.zone ?? 'grasslands', null);
 
     this.setupCamera();
     this.setupDepth();
 
-    this.inventory = [];
-    this.emitInventoryChange();
+    if (save) {
+      this.player.setHp(save.hp);
+      this.inventory = save.inventory.slice(0, MAX_INVENTORY);
+      this.emitInventoryChange();
+      this.game.events.emit(GAME_EVENTS.SAVE_LOADED);
+    } else {
+      this.inventory = [];
+      this.emitInventoryChange();
+    }
 
     // React → Phaser: dialog close signal
     this.game.events.on(GAME_EVENTS.DIALOG_CLOSE, this.handleDialogClose, this);
@@ -530,6 +539,7 @@ export class MainScene extends Phaser.Scene {
       this.cameras.main.once('camerafadeincomplete', () => {
         this.isTransitioning = false;
         this.player.setFrozen(false);
+        this.saveCurrentState();
       });
     });
   }
@@ -588,6 +598,7 @@ export class MainScene extends Phaser.Scene {
     this.spawnParticleBurst(pos.x, pos.y, 0xffffff, 8, 55, 350);
     this.spawnParticleBurst(pos.x, pos.y, 0xfde68a, 5, 35, 280);
     this.showDamageNumber(pos.x, pos.y - 10, 2, false);
+    this.saveCurrentState();
   }
 
   // ─── Juice helpers ────────────────────────────────────────────────────────
@@ -667,6 +678,17 @@ export class MainScene extends Phaser.Scene {
     this.scene.pause();
   }
 
+  // ─── Save / Load ──────────────────────────────────────────────────────────
+
+  private saveCurrentState(): void {
+    SaveSystem.save({
+      hp: this.player.getHp(),
+      zone: this.currentZone,
+      inventory: [...this.inventory],
+      savedAt: Date.now(),
+    });
+  }
+
   // ─── Inventory ────────────────────────────────────────────────────────────
 
   private addToInventory(item: InventoryItem): void {
@@ -675,6 +697,7 @@ export class MainScene extends Phaser.Scene {
       this.inventory = this.inventory.slice(this.inventory.length - MAX_INVENTORY);
     }
     this.emitInventoryChange();
+    this.saveCurrentState();
   }
 
   private emitInventoryChange(): void {

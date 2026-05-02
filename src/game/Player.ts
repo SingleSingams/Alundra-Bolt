@@ -411,6 +411,11 @@ export class Player extends Phaser.GameObjects.Container {
     return this.hp;
   }
 
+  setHp(value: number): void {
+    this.hp = Math.max(0, Math.min(MAX_HP, value));
+    this.scene.game.events.emit(GAME_EVENTS.HP_CHANGE, this.hp);
+  }
+
   isInAir(): boolean {
     return this.isJumping;
   }

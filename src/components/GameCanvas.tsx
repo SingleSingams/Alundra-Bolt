@@ -19,6 +19,7 @@ export function GameCanvas() {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [zone, setZone] = useState<ZoneId>('grasslands');
   const [dialog, setDialog] = useState<DialogPayload | null>(null);
+  const [saveNotice, setSaveNotice] = useState(false);
 
   const handleHpChange = useCallback((newHp: number) => setHp(newHp), []);
   const handleJump = useCallback(() => setIsJumping(true), []);
@@ -32,6 +33,10 @@ export function GameCanvas() {
     (payload: DialogPayload) => setDialog(payload),
     []
   );
+  const handleSaveLoaded = useCallback(() => {
+    setSaveNotice(true);
+    setTimeout(() => setSaveNotice(false), 2500);
+  }, []);
 
   const closeDialog = useCallback(() => {
     setDialog(null);
@@ -51,6 +56,7 @@ export function GameCanvas() {
     game.events.on(GAME_EVENTS.INVENTORY_CHANGE, handleInventoryChange);
     game.events.on(GAME_EVENTS.ZONE_CHANGE, handleZoneChange);
     game.events.on(GAME_EVENTS.DIALOG_OPEN, handleDialogOpen);
+    game.events.on(GAME_EVENTS.SAVE_LOADED, handleSaveLoaded);
 
     return () => {
       game.events.off(GAME_EVENTS.HP_CHANGE, handleHpChange);
@@ -59,6 +65,7 @@ export function GameCanvas() {
       game.events.off(GAME_EVENTS.INVENTORY_CHANGE, handleInventoryChange);
       game.events.off(GAME_EVENTS.ZONE_CHANGE, handleZoneChange);
       game.events.off(GAME_EVENTS.DIALOG_OPEN, handleDialogOpen);
+      game.events.off(GAME_EVENTS.SAVE_LOADED, handleSaveLoaded);
       game.destroy(true);
       gameRef.current = null;
     };
@@ -69,6 +76,7 @@ export function GameCanvas() {
     handleInventoryChange,
     handleZoneChange,
     handleDialogOpen,
+    handleSaveLoaded,
   ]);
 
   return (
@@ -89,6 +97,13 @@ export function GameCanvas() {
         inventory={inventory}
         zone={zone}
       />
+      {saveNotice && (
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-50
+          bg-stone-900/80 border border-amber-600/60 text-amber-300 text-xs font-mono
+          px-4 py-2 rounded shadow-lg animate-fade-in">
+          Spielstand geladen
+        </div>
+      )}
       <DialogBox
         isOpen={dialog !== null}
         npcName={dialog?.npcName ?? ''}
