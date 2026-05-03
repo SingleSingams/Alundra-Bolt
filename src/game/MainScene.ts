@@ -223,6 +223,7 @@ export class MainScene extends Phaser.Scene {
   private level = 1;
   private minimapThrottle = 0;
   private useItemKey!: Phaser.Input.Keyboard.Key;
+  private killedEnemyIds = new Set<string>();
 
   constructor() {
     super({ key: 'MainScene' });
@@ -263,6 +264,7 @@ export class MainScene extends Phaser.Scene {
       this.inventory = save.inventory.slice(0, MAX_INVENTORY);
       this.xp = save.xp ?? 0;
       this.level = save.level ?? 1;
+      this.killedEnemyIds = new Set(save.killedEnemies ?? []);
       this.recalculateAttackDamage();
       this.emitInventoryChange();
       this.game.events.emit(GAME_EVENTS.XP_CHANGE, {
@@ -559,9 +561,12 @@ export class MainScene extends Phaser.Scene {
 
   private spawnEnemies(spawns: ZoneConfig['enemySpawns']): void {
     for (const spawn of spawns) {
+      const id = `${this.currentZone}:${spawn.tx},${spawn.ty}`;
+      if (this.killedEnemyIds.has(id)) continue;
       const px = spawn.tx * TILE_SIZE + TILE_SIZE / 2;
       const py = spawn.ty * TILE_SIZE + TILE_SIZE / 2;
       const enemy = new Enemy(this, px, py, spawn.axis, this.level, spawn.type ?? 'basic');
+      enemy.setName(id);
       this.enemies.push(enemy);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       this.physics.add.collider(enemy as any, this.obstacles);
@@ -767,7 +772,8 @@ export class MainScene extends Phaser.Scene {
       (_zone, enemyObj) => {
         const enemy = enemyObj as Enemy;
         if (!enemy.canBeHit()) return;
-        enemy.takeDamage(this.currentAttackDamage, (ex, ey) => this.onEnemyDeath(ex, ey));
+        const eid = enemy.name;
+        enemy.takeDamage(this.currentAttackDamage, (ex, ey) => this.onEnemyDeath(ex, ey, eid));
 
         SoundSystem.playEnemyHit();
         this.cameras.main.shake(120, 0.004);
@@ -788,7 +794,8 @@ export class MainScene extends Phaser.Scene {
         const enemy = enemyObj as Enemy;
         if (proj.isSpent() || proj.isEnemyProjectile || !enemy.canBeHit()) return;
         proj.hit();
-        enemy.takeDamage(PROJECTILE_DAMAGE, (ex, ey) => this.onEnemyDeath(ex, ey));
+        const eid2 = enemy.name;
+        enemy.takeDamage(PROJECTILE_DAMAGE, (ex, ey) => this.onEnemyDeath(ex, ey, eid2));
         this.spawnParticleBurst(enemy.x, enemy.y, 0xfbbf24, 5, 40, 280);
         this.showDamageNumber(enemy.x, enemy.y - 10, PROJECTILE_DAMAGE, false);
       },
@@ -812,7 +819,8 @@ export class MainScene extends Phaser.Scene {
     );
   }
 
-  private onEnemyDeath(x: number, y: number): void {
+  private onEnemyDeath(x: number, y: number, enemyId: string): void {
+    if (enemyId) this.killedEnemyIds.add(enemyId);
     this.enemies = this.enemies.filter((e) => !e.isDying() && e.active);
     if (Math.random() < CHEST_DROP_CHANCE) {
       this.spawnWorldItem(x, y, 'chest');
@@ -951,6 +959,7 @@ export class MainScene extends Phaser.Scene {
       xp: this.xp,
       level: this.level,
       savedAt: Date.now(),
+      killedEnemies: [...this.killedEnemyIds],
     });
   }
 

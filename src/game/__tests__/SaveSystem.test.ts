@@ -10,6 +10,7 @@ const FULL_SAVE = {
   xp: 25,
   level: 3,
   savedAt: 1000,
+  killedEnemies: ['grasslands:14,14', 'forest:30,14'],
 };
 
 describe('SaveSystem', () => {
@@ -57,6 +58,13 @@ describe('SaveSystem', () => {
     expect(loaded?.inventory).toEqual([]);
     expect(loaded?.xp).toBe(0);
     expect(loaded?.level).toBe(1);
+    expect(loaded?.killedEnemies).toEqual([]);
+  });
+
+  it('saves and restores killedEnemies', () => {
+    SaveSystem.save(FULL_SAVE);
+    const loaded = SaveSystem.load();
+    expect(loaded?.killedEnemies).toEqual(['grasslands:14,14', 'forest:30,14']);
   });
 
   it('returns null on corrupt JSON', () => {

@@ -1,12 +1,13 @@
 import { ZoneId, InventoryItem } from './constants';
 
-interface SaveData {
+export interface SaveData {
   hp: number;
   zone: ZoneId;
   inventory: InventoryItem[];
   xp: number;
   level: number;
   savedAt: number;
+  killedEnemies: string[];
 }
 
 const SAVE_KEY = 'verdant-chronicles-save';
@@ -32,6 +33,7 @@ export const SaveSystem = {
         xp: parsed.xp ?? 0,
         level: parsed.level ?? 1,
         savedAt: parsed.savedAt ?? 0,
+        killedEnemies: parsed.killedEnemies ?? [],
       };
     } catch {
       return null;
