@@ -299,15 +299,46 @@ function Minimap({ zone }: MinimapProps) {
   );
 }
 
+interface XPBarProps {
+  xp: number;
+  level: number;
+  nextLevelXp: number | null;
+}
+
+function XPBar({ xp, level, nextLevelXp }: XPBarProps) {
+  const pct = nextLevelXp ? Math.min(xp / nextLevelXp, 1) : 1;
+  return (
+    <div className="mt-2">
+      <div className="flex items-center justify-between mb-0.5">
+        <span className="text-[9px] font-bold tracking-widest text-stone-400 uppercase">
+          Lv.{level}
+        </span>
+        <span className="text-[9px] font-mono text-stone-500">
+          {nextLevelXp ? `${xp}/${nextLevelXp}` : 'MAX'}
+        </span>
+      </div>
+      <div className="w-full h-1.5 rounded-full bg-stone-700/70 overflow-hidden">
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-amber-500 to-yellow-300 transition-all duration-500"
+          style={{ width: `${pct * 100}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
 interface HUDProps {
   hp: number;
   maxHp: number;
   isJumping: boolean;
   inventory: InventoryItem[];
   zone: ZoneId;
+  xp: number;
+  level: number;
+  nextLevelXp: number | null;
 }
 
-export function HUD({ hp, maxHp, isJumping, inventory, zone }: HUDProps) {
+export function HUD({ hp, maxHp, isJumping, inventory, zone, xp, level, nextLevelXp }: HUDProps) {
   const fullHearts = Math.floor(hp / 2);
   const hasHalf = hp % 2 === 1;
   const totalSlots = Math.ceil(maxHp / 2);
@@ -357,6 +388,7 @@ export function HUD({ hp, maxHp, isJumping, inventory, zone }: HUDProps) {
           <div className="mt-1 text-[9px] text-stone-500 font-mono tracking-wider text-center">
             {hp}/{maxHp}
           </div>
+          <XPBar xp={xp} level={level} nextLevelXp={nextLevelXp} />
         </div>
       </div>
 

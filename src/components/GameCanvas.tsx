@@ -7,6 +7,7 @@ import {
   InventoryItem,
   ZoneId,
   DialogPayload,
+  XP_THRESHOLDS,
 } from '../game/constants';
 import { HUD } from './HUD';
 import { DialogBox } from './DialogBox';
@@ -22,6 +23,10 @@ export function GameCanvas() {
   const [dialog, setDialog] = useState<DialogPayload | null>(null);
   const [saveNotice, setSaveNotice] = useState(false);
   const [gameOver, setGameOver] = useState(false);
+  const [xp, setXp] = useState(0);
+  const [level, setLevel] = useState(1);
+  const [nextLevelXp, setNextLevelXp] = useState<number | null>(XP_THRESHOLDS[0]);
+  const [levelUpNotice, setLevelUpNotice] = useState<number | null>(null);
 
   const handleHpChange = useCallback((newHp: number) => setHp(newHp), []);
   const handleJump = useCallback(() => setIsJumping(true), []);
@@ -40,6 +45,18 @@ export function GameCanvas() {
     setTimeout(() => setSaveNotice(false), 2500);
   }, []);
   const handleGameOver = useCallback(() => setGameOver(true), []);
+  const handleXpChange = useCallback(
+    (data: { xp: number; level: number; nextLevelXp: number | null }) => {
+      setXp(data.xp);
+      setLevel(data.level);
+      setNextLevelXp(data.nextLevelXp);
+    },
+    []
+  );
+  const handleLevelUp = useCallback((newLevel: number) => {
+    setLevelUpNotice(newLevel);
+    setTimeout(() => setLevelUpNotice(null), 2200);
+  }, []);
 
   const closeDialog = useCallback(() => {
     setDialog(null);
@@ -61,6 +78,8 @@ export function GameCanvas() {
     game.events.on(GAME_EVENTS.DIALOG_OPEN, handleDialogOpen);
     game.events.on(GAME_EVENTS.SAVE_LOADED, handleSaveLoaded);
     game.events.on(GAME_EVENTS.GAME_OVER, handleGameOver);
+    game.events.on(GAME_EVENTS.XP_CHANGE, handleXpChange);
+    game.events.on(GAME_EVENTS.LEVEL_UP, handleLevelUp);
 
     return () => {
       game.events.off(GAME_EVENTS.HP_CHANGE, handleHpChange);
@@ -71,6 +90,8 @@ export function GameCanvas() {
       game.events.off(GAME_EVENTS.DIALOG_OPEN, handleDialogOpen);
       game.events.off(GAME_EVENTS.SAVE_LOADED, handleSaveLoaded);
       game.events.off(GAME_EVENTS.GAME_OVER, handleGameOver);
+      game.events.off(GAME_EVENTS.XP_CHANGE, handleXpChange);
+      game.events.off(GAME_EVENTS.LEVEL_UP, handleLevelUp);
       game.destroy(true);
       gameRef.current = null;
     };
@@ -83,6 +104,8 @@ export function GameCanvas() {
     handleDialogOpen,
     handleSaveLoaded,
     handleGameOver,
+    handleXpChange,
+    handleLevelUp,
   ]);
 
   return (
@@ -102,7 +125,20 @@ export function GameCanvas() {
         isJumping={isJumping}
         inventory={inventory}
         zone={zone}
+        xp={xp}
+        level={level}
+        nextLevelXp={nextLevelXp}
       />
+      {levelUpNotice !== null && (
+        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-50 text-center animate-in fade-in zoom-in duration-300">
+          <div className="bg-amber-900/80 border-2 border-amber-400/80 text-amber-200 font-bold
+            px-6 py-3 rounded-xl shadow-2xl shadow-amber-900/50">
+            <div className="text-xs tracking-widest uppercase text-amber-400 mb-1">Level Up!</div>
+            <div className="text-2xl font-extrabold text-amber-100">Level {levelUpNotice}</div>
+            <div className="text-xs text-amber-300 mt-1">HP vollständig wiederhergestellt</div>
+          </div>
+        </div>
+      )}
       {saveNotice && (
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-50
           bg-stone-900/80 border border-amber-600/60 text-amber-300 text-xs font-mono

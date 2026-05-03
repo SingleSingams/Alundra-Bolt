@@ -23,6 +23,7 @@ import {
   CHEST_DROP_CHANCE,
   CHEST_INTERACT_RADIUS,
   HEART_HEAL_AMOUNT,
+  MAX_HP,
   MAX_INVENTORY,
   InventoryItem,
   ZoneId,
@@ -30,10 +31,15 @@ import {
   TRANSITION_FADE_MS,
   TRANSITION_EDGE_TILES,
   DialogPayload,
+  XP_PER_ENEMY,
+  XP_PER_BOSS,
+  MAX_LEVEL,
+  XP_THRESHOLDS,
 } from './constants';
 import { SaveSystem } from './SaveSystem';
 import { Boss } from './Boss';
 import { Projectile } from './Projectile';
+import { SoundSystem } from './SoundSystem';
 
 const TREE_POSITIONS: Array<{ x: number; y: number }> = [];
 const SPAWN_SAFE_TILES = 6;
@@ -211,6 +217,8 @@ export class MainScene extends Phaser.Scene {
   private currentAttackDamage = ATTACK_DAMAGE;
   private boss: Boss | null = null;
   private projectiles: Projectile[] = [];
+  private xp = 0;
+  private level = 1;
 
   constructor() {
     super({ key: 'MainScene' });
@@ -249,12 +257,20 @@ export class MainScene extends Phaser.Scene {
     if (save) {
       this.player.setHp(save.hp);
       this.inventory = save.inventory.slice(0, MAX_INVENTORY);
+      this.xp = save.xp ?? 0;
+      this.level = save.level ?? 1;
       this.recalculateAttackDamage();
       this.emitInventoryChange();
+      this.game.events.emit(GAME_EVENTS.XP_CHANGE, {
+        xp: this.xp, level: this.level, nextLevelXp: XP_THRESHOLDS[this.level - 1] ?? null,
+      });
       this.game.events.emit(GAME_EVENTS.SAVE_LOADED);
     } else {
       this.inventory = [];
       this.emitInventoryChange();
+      this.game.events.emit(GAME_EVENTS.XP_CHANGE, {
+        xp: 0, level: 1, nextLevelXp: XP_THRESHOLDS[0],
+      });
     }
 
     // React → Phaser: dialog close signal
@@ -263,11 +279,14 @@ export class MainScene extends Phaser.Scene {
     this.game.events.on(GAME_EVENTS.PLAYER_DAMAGED, this.onPlayerDamaged, this);
     // Shield block → blue spark effect
     this.game.events.on(GAME_EVENTS.SHIELD_BLOCK, this.onShieldBlock, this);
+    // Attack sound on every swing
+    this.game.events.on(GAME_EVENTS.PLAYER_ATTACK, () => SoundSystem.playAttack(), this);
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off(GAME_EVENTS.DIALOG_CLOSE, this.handleDialogClose, this);
       this.game.events.off(GAME_EVENTS.PLAYER_DAMAGED, this.onPlayerDamaged, this);
       this.game.events.off(GAME_EVENTS.SHIELD_BLOCK, this.onShieldBlock, this);
+      this.game.events.off(GAME_EVENTS.PLAYER_ATTACK, undefined, this);
     });
   }
 
@@ -603,6 +622,7 @@ export class MainScene extends Phaser.Scene {
           (bx, by) => this.onBossDeath(bx, by)
         );
         if (!died) {
+          SoundSystem.playEnemyHit();
           this.cameras.main.shake(120, 0.004);
           this.spawnParticleBurst(this.boss.x, this.boss.y, 0xef4444, 7, 50, 320);
           this.showDamageNumber(this.boss.x, this.boss.y - 22, this.currentAttackDamage, false);
@@ -622,6 +642,7 @@ export class MainScene extends Phaser.Scene {
         proj.hit();
         const died = this.boss.takeDamage(PROJECTILE_DAMAGE, (bx, by) => this.onBossDeath(bx, by));
         if (!died) {
+          SoundSystem.playEnemyHit();
           this.spawnParticleBurst(this.boss.x, this.boss.y, 0xfbbf24, 5, 40, 280);
           this.showDamageNumber(this.boss.x, this.boss.y - 22, PROJECTILE_DAMAGE, false);
         }
@@ -629,6 +650,7 @@ export class MainScene extends Phaser.Scene {
     );
 
     this.game.events.once('boss-phase-2', (pos: { x: number; y: number }) => {
+      SoundSystem.playBossPhase2();
       this.cameras.main.shake(450, 0.018);
       this.spawnParticleBurst(pos.x, pos.y, 0x9333ea, 22, 95, 650);
       this.spawnParticleBurst(pos.x, pos.y, 0xec4899, 16, 70, 500);
@@ -638,12 +660,13 @@ export class MainScene extends Phaser.Scene {
 
   private onBossDeath(x: number, y: number): void {
     this.boss = null;
+    this.gainXp(XP_PER_BOSS);
+    SoundSystem.playBossDeath();
     this.cameras.main.shake(500, 0.022);
     this.spawnParticleBurst(x, y, 0xef4444, 24, 110, 700);
     this.spawnParticleBurst(x, y, 0xfbbf24, 18, 85, 580);
     this.spawnParticleBurst(x, y, 0x9333ea, 14, 65, 450);
     this.flashScreen();
-    // Guaranteed heart drops
     this.spawnWorldItem(x - 24, y, 'heart_pickup');
     this.spawnWorldItem(x + 24, y, 'heart_pickup');
     this.spawnWorldItem(x, y - 24, 'heart_pickup');
@@ -733,6 +756,7 @@ export class MainScene extends Phaser.Scene {
         if (!enemy.canBeHit()) return;
         enemy.takeDamage(this.currentAttackDamage, (ex, ey) => this.onEnemyDeath(ex, ey));
 
+        SoundSystem.playEnemyHit();
         this.cameras.main.shake(120, 0.004);
         this.spawnParticleBurst(enemy.x, enemy.y, 0xef4444, 7, 50, 320);
         this.showDamageNumber(enemy.x, enemy.y - 10, this.currentAttackDamage, false);
@@ -765,7 +789,8 @@ export class MainScene extends Phaser.Scene {
     if (Math.random() < CHEST_DROP_CHANCE) {
       this.spawnWorldItem(x, y, 'chest');
     }
-    // Big death burst + screen flash
+    this.gainXp(XP_PER_ENEMY);
+    SoundSystem.playEnemyDeath();
     this.spawnParticleBurst(x, y, 0xef4444, 12, 70, 500);
     this.spawnParticleBurst(x, y, 0xfbbf24, 6, 45, 400);
     this.flashScreen();
@@ -774,6 +799,7 @@ export class MainScene extends Phaser.Scene {
   // ─── Player damaged handler ───────────────────────────────────────────────
 
   private onPlayerDamaged(pos: { x: number; y: number }): void {
+    SoundSystem.playPlayerDamage();
     this.spawnParticleBurst(pos.x, pos.y, 0xffffff, 8, 55, 350);
     this.spawnParticleBurst(pos.x, pos.y, 0xfde68a, 5, 35, 280);
     this.showDamageNumber(pos.x, pos.y - 10, 2, false);
@@ -783,6 +809,7 @@ export class MainScene extends Phaser.Scene {
   }
 
   private onShieldBlock(pos: { x: number; y: number }): void {
+    SoundSystem.playShieldBlock();
     this.spawnParticleBurst(pos.x, pos.y, 0x60a5fa, 10, 45, 320);
     this.spawnParticleBurst(pos.x, pos.y, 0xbfdbfe, 6, 28, 240);
     this.showDamageNumber(pos.x, pos.y - 10, 0, true);
@@ -873,8 +900,36 @@ export class MainScene extends Phaser.Scene {
       hp: this.player.getHp(),
       zone: this.currentZone,
       inventory: [...this.inventory],
+      xp: this.xp,
+      level: this.level,
       savedAt: Date.now(),
     });
+  }
+
+  private gainXp(amount: number): void {
+    if (this.level >= MAX_LEVEL) return;
+    this.xp += amount;
+    const threshold = XP_THRESHOLDS[this.level - 1];
+    this.game.events.emit(GAME_EVENTS.XP_CHANGE, {
+      xp: this.xp, level: this.level, nextLevelXp: threshold,
+    });
+    if (this.xp >= threshold) {
+      this.level++;
+      this.onLevelUp();
+    }
+  }
+
+  private onLevelUp(): void {
+    this.player.setHp(MAX_HP);
+    SoundSystem.playLevelUp();
+    this.game.events.emit(GAME_EVENTS.LEVEL_UP, this.level);
+    this.game.events.emit(GAME_EVENTS.XP_CHANGE, {
+      xp: this.xp, level: this.level, nextLevelXp: XP_THRESHOLDS[this.level - 1] ?? null,
+    });
+    this.spawnParticleBurst(this.player.x, this.player.y, 0xfde68a, 16, 80, 500);
+    this.spawnParticleBurst(this.player.x, this.player.y, 0x4ade80, 12, 60, 400);
+    this.cameras.main.shake(200, 0.006);
+    this.saveCurrentState();
   }
 
   // ─── Inventory ────────────────────────────────────────────────────────────
@@ -915,8 +970,9 @@ export class MainScene extends Phaser.Scene {
           const healAmt = isPotion ? 4 : HEART_HEAL_AMOUNT;
           item.collect(() => {
             this.player.heal(healAmt);
+            SoundSystem.playHeal();
             this.addToInventory(isPotion ? 'potion' : 'heart');
-            this.spawnParticleBurst(ix, iy, isPotion ? 0x4ade80 : 0x4ade80, 8, 42, 400);
+            this.spawnParticleBurst(ix, iy, 0x4ade80, 8, 42, 400);
             this.showDamageNumber(ix, iy - 8, healAmt, true);
           });
         }
@@ -972,6 +1028,7 @@ export class MainScene extends Phaser.Scene {
         const chestY = this.activeChest.y;
         const reward = this.activeChest.openChest();
         if (reward) {
+          SoundSystem.playChestOpen();
           this.applyChestReward(reward);
           this.spawnParticleBurst(chestX, chestY, 0x4ade80, 10, 55, 480);
         }
@@ -1046,6 +1103,7 @@ export class MainScene extends Phaser.Scene {
       const proj = new Projectile(this, this.player.x, this.player.y, angle);
       this.projectiles.push(proj);
       this.player.markShot();
+      SoundSystem.playProjectile();
     }
 
     if (!this.isTransitioning && !this.player.isDialogActive()) {
