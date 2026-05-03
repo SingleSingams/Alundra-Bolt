@@ -16,6 +16,7 @@ import {
   ZoneId,
   ZONE_BOB_FREQ,
 } from './constants';
+import { VirtualInput } from './VirtualInput';
 
 export type Direction = 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw' | 'idle';
 export type FacingDirection = Exclude<Direction, 'idle'>;
@@ -142,12 +143,17 @@ export class Player extends Phaser.GameObjects.Container {
   }
 
   update(delta: number): void {
-    // Read JustDown once per frame before any handler can consume the flag.
+    // Read JustDown once per frame (keyboard + virtual input).
     this.jumpPressedThisFrame =
       Phaser.Input.Keyboard.JustDown(this.keys.jumpZ) ||
-      Phaser.Input.Keyboard.JustDown(this.keys.spaceJump);
-    this.attackPressedThisFrame = Phaser.Input.Keyboard.JustDown(this.keys.attackX);
-    this.shootPressedThisFrame = Phaser.Input.Keyboard.JustDown(this.keys.shootY);
+      Phaser.Input.Keyboard.JustDown(this.keys.spaceJump) ||
+      VirtualInput.isJumpJustDown();
+    this.attackPressedThisFrame =
+      Phaser.Input.Keyboard.JustDown(this.keys.attackX) ||
+      VirtualInput.isAttackJustDown();
+    this.shootPressedThisFrame =
+      Phaser.Input.Keyboard.JustDown(this.keys.shootY) ||
+      VirtualInput.isShootJustDown();
 
     if (this.dialogActive || this.frozen) {
       const body = this.body as Phaser.Physics.Arcade.Body;
@@ -165,16 +171,17 @@ export class Player extends Phaser.GameObjects.Container {
     this.updateInvincibility(delta);
     this.updateBob(delta);
     this.updateAttackZonePosition();
+    VirtualInput.endFrame();
   }
 
   private handleMovement(): void {
     const body = this.body as Phaser.Physics.Arcade.Body;
     const { up, down, left, right, upW, downS, leftA, rightD } = this.keys;
 
-    const goUp = up.isDown || upW.isDown;
-    const goDown = down.isDown || downS.isDown;
-    const goLeft = left.isDown || leftA.isDown;
-    const goRight = right.isDown || rightD.isDown;
+    const goUp    = up.isDown    || upW.isDown    || VirtualInput.up;
+    const goDown  = down.isDown  || downS.isDown  || VirtualInput.down;
+    const goLeft  = left.isDown  || leftA.isDown  || VirtualInput.left;
+    const goRight = right.isDown || rightD.isDown || VirtualInput.right;
 
     let vx = 0;
     let vy = 0;

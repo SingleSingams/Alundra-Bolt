@@ -10,10 +10,13 @@ import {
   XP_THRESHOLDS,
   MinimapData,
 } from '../game/constants';
+import { SoundSystem } from '../game/SoundSystem';
+import { SettingsSystem, Settings } from '../game/SettingsSystem';
 import { HUD } from './HUD';
 import { DialogBox } from './DialogBox';
 import { GameOverScreen } from './GameOverScreen';
 import { PauseMenu } from './PauseMenu';
+import { TouchControls } from './TouchControls';
 
 export function GameCanvas() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -31,6 +34,19 @@ export function GameCanvas() {
   const [levelUpNotice, setLevelUpNotice] = useState<number | null>(null);
   const [minimapData, setMinimapData] = useState<MinimapData | null>(null);
   const [paused, setPaused] = useState(false);
+  const [settings, setSettings] = useState<Settings>(() => SettingsSystem.load());
+
+  const handleSettingsChange = useCallback((s: Settings) => {
+    setSettings(s);
+    SettingsSystem.save(s);
+    SoundSystem.setVolume(s.volume);
+  }, []);
+
+  // Apply initial volume on mount
+  useEffect(() => {
+    SoundSystem.setVolume(settings.volume);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleHpChange = useCallback((newHp: number) => setHp(newHp), []);
   const handleJump = useCallback(() => setIsJumping(true), []);
@@ -116,7 +132,7 @@ export function GameCanvas() {
     handleMinimapUpdate,
   ]);
 
-  // ESC key → pause toggle (skip during dialog or game over)
+  // ESC key → pause toggle (skip during game over)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !gameOver) {
@@ -141,7 +157,7 @@ export function GameCanvas() {
   return (
     <div className="relative w-full h-full">
       <div ref={containerRef} className="w-full h-full" />
-      {/* Vignette: dark radial gradient frames the scene */}
+      {/* Vignette */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
@@ -159,7 +175,9 @@ export function GameCanvas() {
         level={level}
         nextLevelXp={nextLevelXp}
         minimapData={minimapData}
+        showHints={settings.showHints}
       />
+      {settings.showTouchControls && <TouchControls />}
       {levelUpNotice !== null && (
         <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-50 text-center animate-in fade-in zoom-in duration-300">
           <div className="bg-amber-900/80 border-2 border-amber-400/80 text-amber-200 font-bold
@@ -184,7 +202,12 @@ export function GameCanvas() {
         onClose={closeDialog}
       />
       <GameOverScreen isOpen={gameOver} />
-      <PauseMenu isOpen={paused && !gameOver} onResume={() => setPaused(false)} />
+      <PauseMenu
+        isOpen={paused && !gameOver}
+        onResume={() => setPaused(false)}
+        settings={settings}
+        onSettingsChange={handleSettingsChange}
+      />
     </div>
   );
 }

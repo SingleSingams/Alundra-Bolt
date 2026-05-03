@@ -381,9 +381,10 @@ interface HUDProps {
   level: number;
   nextLevelXp: number | null;
   minimapData: MinimapData | null;
+  showHints: boolean;
 }
 
-export function HUD({ hp, maxHp, isJumping, inventory, zone, xp, level, nextLevelXp, minimapData }: HUDProps) {
+export function HUD({ hp, maxHp, isJumping, inventory, zone, xp, level, nextLevelXp, minimapData, showHints }: HUDProps) {
   const fullHearts = Math.floor(hp / 2);
   const hasHalf = hp % 2 === 1;
   const totalSlots = Math.ceil(maxHp / 2);
@@ -451,17 +452,19 @@ export function HUD({ hp, maxHp, isJumping, inventory, zone, xp, level, nextLeve
         </div>
       )}
 
-      <div className="absolute bottom-4 right-4 pointer-events-none select-none">
-        <div className="bg-stone-900/75 backdrop-blur-sm border border-stone-700/60 rounded-xl px-3 py-2.5 shadow-xl space-y-1.5">
-          <div className="text-[10px] font-bold tracking-widest text-stone-400 uppercase mb-1.5">
-            Controls
+      {showHints && (
+        <div className="absolute bottom-4 right-4 pointer-events-none select-none">
+          <div className="bg-stone-900/75 backdrop-blur-sm border border-stone-700/60 rounded-xl px-3 py-2.5 shadow-xl space-y-1.5">
+            <div className="text-[10px] font-bold tracking-widest text-stone-400 uppercase mb-1.5">
+              Controls
+            </div>
+            <ControlBadge keys={['W', 'A', 'S', 'D']} label="Move" />
+            <ControlBadge keys={['Z', 'Spc']} label="Jump / Open" />
+            <ControlBadge keys={['X']} label="Attack" />
+            <ControlBadge keys={['Y']} label="Ranged" />
           </div>
-          <ControlBadge keys={['W', 'A', 'S', 'D']} label="Move" />
-          <ControlBadge keys={['Z', 'Spc']} label="Jump / Open" />
-          <ControlBadge keys={['X']} label="Attack" />
-          <ControlBadge keys={['Y']} label="Ranged" />
         </div>
-      </div>
+      )}
     </>
   );
 }

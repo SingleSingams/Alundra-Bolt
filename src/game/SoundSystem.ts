@@ -3,13 +3,19 @@ type OscType = OscillatorType;
 class SoundSystemClass {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
+  private volumeMultiplier = 1;
+
+  setVolume(v: number): void {
+    this.volumeMultiplier = Math.max(0, Math.min(1, v));
+    if (this.master) this.master.gain.value = 0.18 * this.volumeMultiplier;
+  }
 
   private ensure(): AudioContext | null {
     if (this.ctx) return this.ctx;
     try {
       this.ctx = new AudioContext();
       this.master = this.ctx.createGain();
-      this.master.gain.value = 0.18;
+      this.master.gain.value = 0.18 * this.volumeMultiplier;
       this.master.connect(this.ctx.destination);
     } catch {
       return null;
