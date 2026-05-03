@@ -1,4 +1,5 @@
 import * as Phaser from 'phaser';
+import { GAME_EVENTS } from './constants';
 
 export const BOSS_MAX_HP = 20;
 const BOSS_SPEED_P1 = 58;
@@ -147,11 +148,16 @@ export class Boss extends Phaser.GameObjects.Container {
     this.setDepth(this.y + 1);
   }
 
+  emitHp(): void {
+    this.scene.game.events.emit(GAME_EVENTS.BOSS_HP, { hp: this.hp, maxHp: BOSS_MAX_HP, phase: this.phase });
+  }
+
   takeDamage(amount: number, onDeath: (x: number, y: number) => void): boolean {
     if (!this.canBeHit()) return false;
     this.hp = Math.max(0, this.hp - amount);
     this.invulnTimer = BOSS_HIT_INVULN_MS;
     this.drawHpBar();
+    this.emitHp();
 
     // Hit flash
     this.sprite.setTint(0xffffff);
@@ -193,6 +199,7 @@ export class Boss extends Phaser.GameObjects.Container {
 
   private die(onDeath: (x: number, y: number) => void): void {
     this.dying = true;
+    this.scene.game.events.emit(GAME_EVENTS.BOSS_HP, { hp: 0, maxHp: BOSS_MAX_HP, phase: this.phase });
     (this.body as Phaser.Physics.Arcade.Body).enable = false;
     const dx = this.x;
     const dy = this.y;

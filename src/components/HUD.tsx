@@ -384,6 +384,50 @@ function XPBar({ xp, level, nextLevelXp }: XPBarProps) {
   );
 }
 
+interface BossHpBarProps {
+  hp: number;
+  maxHp: number;
+  phase: number;
+}
+
+function BossHpBar({ hp, maxHp, phase }: BossHpBarProps) {
+  const pct = Math.max(0, hp / maxHp);
+  const isP2 = phase === 2;
+  return (
+    <div className="absolute top-4 left-1/2 -translate-x-1/2 pointer-events-none select-none w-56 max-w-[70vw]">
+      <div className="bg-stone-900/85 backdrop-blur-sm border border-stone-700/60 rounded-xl px-3 py-2 shadow-2xl">
+        <div className="flex items-center justify-between mb-1.5">
+          <span className={cn(
+            'text-[10px] font-bold tracking-widest uppercase font-mono',
+            isP2 ? 'text-purple-400' : 'text-red-400'
+          )}>
+            Void Tyrant
+          </span>
+          <span className="text-[10px] font-mono text-stone-500">
+            {hp}/{maxHp}
+          </span>
+        </div>
+        <div className="w-full h-3 rounded-full bg-stone-800/80 overflow-hidden border border-stone-700/50">
+          <div
+            className={cn(
+              'h-full rounded-full transition-all duration-300',
+              isP2
+                ? 'bg-gradient-to-r from-purple-700 to-pink-500 shadow-[0_0_8px_rgba(168,85,247,0.6)]'
+                : 'bg-gradient-to-r from-red-700 to-red-400 shadow-[0_0_8px_rgba(239,68,68,0.5)]'
+            )}
+            style={{ width: `${pct * 100}%` }}
+          />
+        </div>
+        {isP2 && (
+          <div className="mt-1 text-[8px] font-mono text-purple-400 tracking-widest uppercase text-center animate-pulse">
+            Phase 2
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 interface HUDProps {
   hp: number;
   maxHp: number;
@@ -396,10 +440,11 @@ interface HUDProps {
   minimapData: MinimapData | null;
   showHints: boolean;
   shieldCharges: number;
+  bossHp: { hp: number; maxHp: number; phase: number } | null;
   onUsePotion?: () => void;
 }
 
-export function HUD({ hp, maxHp, isJumping, inventory, zone, xp, level, nextLevelXp, minimapData, showHints, shieldCharges, onUsePotion }: HUDProps) {
+export function HUD({ hp, maxHp, isJumping, inventory, zone, xp, level, nextLevelXp, minimapData, showHints, shieldCharges, bossHp, onUsePotion }: HUDProps) {
   const fullHearts = Math.floor(hp / 2);
   const hasHalf = hp % 2 === 1;
   const totalSlots = Math.ceil(maxHp / 2);
@@ -474,6 +519,10 @@ export function HUD({ hp, maxHp, isJumping, inventory, zone, xp, level, nextLeve
       </div>
 
       <InventoryBar inventory={inventory} onUsePotion={onUsePotion} />
+
+      {bossHp && bossHp.hp > 0 && (
+        <BossHpBar hp={bossHp.hp} maxHp={bossHp.maxHp} phase={bossHp.phase} />
+      )}
 
       <Minimap zone={zone} minimapData={minimapData} />
 

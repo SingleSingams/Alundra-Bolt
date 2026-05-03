@@ -61,6 +61,7 @@ export const GAME_EVENTS = {
   LOADING_COMPLETE: 'loading-complete',
   USE_POTION: 'use-potion',
   SHIELD_CHANGE: 'shield-change',
+  BOSS_HP: 'boss-hp',
 } as const;
 
 export interface MinimapDot {

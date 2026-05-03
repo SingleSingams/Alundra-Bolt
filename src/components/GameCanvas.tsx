@@ -35,6 +35,7 @@ export function GameCanvas() {
   const [levelUpNotice, setLevelUpNotice] = useState<number | null>(null);
   const [minimapData, setMinimapData] = useState<MinimapData | null>(null);
   const [shieldCharges, setShieldCharges] = useState(0);
+  const [bossHp, setBossHp] = useState<{ hp: number; maxHp: number; phase: number } | null>(null);
   const [paused, setPaused] = useState(false);
   const [settings, setSettings] = useState<Settings>(() => SettingsSystem.load());
   const [loadProgress, setLoadProgress] = useState(0);
@@ -86,6 +87,11 @@ export function GameCanvas() {
   const handleLoadComplete = useCallback(() => setLoaded(true), []);
 
   const handleShieldChange = useCallback((charges: number) => setShieldCharges(charges), []);
+  const handleBossHp = useCallback(
+    (data: { hp: number; maxHp: number; phase: number }) =>
+      setBossHp(data.maxHp > 0 ? data : null),
+    []
+  );
 
   const handleUsePotion = useCallback(() => {
     gameRef.current?.events.emit(GAME_EVENTS.USE_POTION);
@@ -117,6 +123,7 @@ export function GameCanvas() {
     game.events.on(GAME_EVENTS.LOADING_PROGRESS, handleLoadProgress);
     game.events.on(GAME_EVENTS.LOADING_COMPLETE, handleLoadComplete);
     game.events.on(GAME_EVENTS.SHIELD_CHANGE, handleShieldChange);
+    game.events.on(GAME_EVENTS.BOSS_HP, handleBossHp);
 
     return () => {
       game.events.off(GAME_EVENTS.HP_CHANGE, handleHpChange);
@@ -133,6 +140,7 @@ export function GameCanvas() {
       game.events.off(GAME_EVENTS.LOADING_PROGRESS, handleLoadProgress);
       game.events.off(GAME_EVENTS.LOADING_COMPLETE, handleLoadComplete);
       game.events.off(GAME_EVENTS.SHIELD_CHANGE, handleShieldChange);
+      game.events.off(GAME_EVENTS.BOSS_HP, handleBossHp);
       game.destroy(true);
       gameRef.current = null;
     };
@@ -151,6 +159,7 @@ export function GameCanvas() {
     handleLoadProgress,
     handleLoadComplete,
     handleShieldChange,
+    handleBossHp,
   ]);
 
   // ESC key → pause toggle (skip during game over)
@@ -198,6 +207,7 @@ export function GameCanvas() {
         minimapData={minimapData}
         showHints={settings.showHints}
         shieldCharges={shieldCharges}
+        bossHp={bossHp}
         onUsePotion={handleUsePotion}
       />
       {settings.showTouchControls && <TouchControls />}

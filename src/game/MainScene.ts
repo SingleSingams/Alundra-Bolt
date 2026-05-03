@@ -529,6 +529,7 @@ export class MainScene extends Phaser.Scene {
     if (this.boss) {
       this.boss.destroy();
       this.boss = null;
+      this.game.events.emit(GAME_EVENTS.BOSS_HP, { hp: 0, maxHp: 0, phase: 1 });
     }
 
     for (const proj of this.projectiles) if (proj.active) proj.destroy();
@@ -605,6 +606,7 @@ export class MainScene extends Phaser.Scene {
     const px = tx * TILE_SIZE + TILE_SIZE / 2;
     const py = ty * TILE_SIZE + TILE_SIZE / 2;
     this.boss = new Boss(this, px, py);
+    this.boss.emitHp();
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     this.physics.add.collider(this.boss as any, this.obstacles);
