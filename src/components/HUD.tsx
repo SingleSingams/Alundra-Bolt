@@ -253,6 +253,10 @@ function InventoryBar({ inventory, onUsePotion }: InventoryBarProps) {
 
 const CANVAS_PX = 100;
 
+const MINIMAP_CHUNK_SIZE = 4;
+const MAP_CHUNKS_X = 60 / MINIMAP_CHUNK_SIZE;
+const MAP_CHUNKS_Y = 60 / MINIMAP_CHUNK_SIZE;
+
 function MinimapCanvas({ data }: { data: MinimapData | null }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -265,18 +269,30 @@ function MinimapCanvas({ data }: { data: MinimapData | null }) {
     const H = canvas.height;
 
     ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = '#1c1917';
+    ctx.fillStyle = '#0c0a09';
     ctx.fillRect(0, 0, W, H);
 
     if (data) {
+      const explored = new Set(data.exploredChunks);
       const tint = ZONES[data.zone].tint;
       const r = (tint >> 16) & 0xff;
       const g = (tint >> 8) & 0xff;
       const b = tint & 0xff;
-      ctx.fillStyle = `rgba(${r},${g},${b},0.10)`;
-      ctx.fillRect(0, 0, W, H);
 
-      // Chests — amber squares
+      const cw = W / MAP_CHUNKS_X;
+      const ch = H / MAP_CHUNKS_Y;
+
+      // Draw explored terrain
+      for (let cy = 0; cy < MAP_CHUNKS_Y; cy++) {
+        for (let cx = 0; cx < MAP_CHUNKS_X; cx++) {
+          if (explored.has(`${cx},${cy}`)) {
+            ctx.fillStyle = `rgba(${r},${g},${b},0.18)`;
+            ctx.fillRect(cx * cw, cy * ch, cw, ch);
+          }
+        }
+      }
+
+      // Chests — amber squares (only if explored)
       ctx.fillStyle = '#fbbf24';
       for (const c of data.chests) {
         ctx.fillRect(c.nx * W - 2, c.ny * H - 2, 4, 4);
@@ -308,6 +324,16 @@ function MinimapCanvas({ data }: { data: MinimapData | null }) {
       ctx.beginPath();
       ctx.arc(data.player.nx * W, data.player.ny * H, 3, 0, Math.PI * 2);
       ctx.fill();
+
+      // Fog overlay for unexplored chunks
+      ctx.fillStyle = 'rgba(0,0,0,0.75)';
+      for (let cy = 0; cy < MAP_CHUNKS_Y; cy++) {
+        for (let cx = 0; cx < MAP_CHUNKS_X; cx++) {
+          if (!explored.has(`${cx},${cy}`)) {
+            ctx.fillRect(cx * cw, cy * ch, cw, ch);
+          }
+        }
+      }
     }
 
     // Border

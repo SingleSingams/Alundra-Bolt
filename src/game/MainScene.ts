@@ -249,6 +249,8 @@ export class MainScene extends Phaser.Scene {
   private minimapThrottle = 0;
   private useItemKey!: Phaser.Input.Keyboard.Key;
   private killedEnemyIds = new Set<string>();
+  private exploredChunks = new Set<string>();
+  private readonly CHUNK_SIZE = 4;
 
   constructor() {
     super({ key: 'MainScene' });
@@ -552,6 +554,7 @@ export class MainScene extends Phaser.Scene {
     const config = ZONE_CONFIGS[zone];
 
     this.clearZoneContent();
+    this.exploredChunks.clear();
 
     this.groundLayer.setTint(ZONES[zone].tint);
 
@@ -1018,6 +1021,16 @@ export class MainScene extends Phaser.Scene {
   private emitMinimapUpdate(): void {
     const sx = 1 / WORLD_WIDTH;
     const sy = 1 / WORLD_HEIGHT;
+
+    // Mark current chunk as explored
+    const cx = Math.floor(this.player.x / (TILE_SIZE * this.CHUNK_SIZE));
+    const cy = Math.floor(this.player.y / (TILE_SIZE * this.CHUNK_SIZE));
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        this.exploredChunks.add(`${cx + dx},${cy + dy}`);
+      }
+    }
+
     const data: MinimapData = {
       player: { nx: this.player.x * sx, ny: this.player.y * sy },
       enemies: this.enemies
@@ -1029,6 +1042,7 @@ export class MainScene extends Phaser.Scene {
         .filter(i => i.active && i.itemType === 'chest' && !i.isOpened())
         .map(i => ({ nx: i.x * sx, ny: i.y * sy })),
       zone: this.currentZone,
+      exploredChunks: [...this.exploredChunks],
     };
     this.game.events.emit(GAME_EVENTS.MINIMAP_UPDATE, data);
   }

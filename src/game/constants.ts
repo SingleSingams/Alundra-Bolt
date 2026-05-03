@@ -88,6 +88,7 @@ export interface MinimapData {
   boss: MinimapDot | null;
   chests: MinimapDot[];
   zone: ZoneId;
+  exploredChunks: string[];
 }
 
 export type InventoryItem = 'heart' | 'sword_upgrade' | 'potion' | 'shield_fragment';
