@@ -181,16 +181,23 @@ function ShieldIcon() {
 interface InventorySlotProps {
   item?: InventoryItem;
   index: number;
+  onUsePotion?: () => void;
 }
 
-function InventorySlot({ item, index }: InventorySlotProps) {
+function InventorySlot({ item, index, onUsePotion }: InventorySlotProps) {
   const hasItem = !!item;
+  const isPotion = item === 'potion';
+
   return (
     <div
+      onClick={isPotion ? onUsePotion : undefined}
       className={cn(
-        'relative w-9 h-9 rounded-md border flex items-center justify-center transition-all duration-200',
+        'relative rounded-md border flex items-center justify-center transition-all duration-200',
+        'w-11 h-11',
         hasItem
-          ? 'bg-stone-800/80 border-amber-600/60 shadow-[0_0_8px_rgba(217,119,6,0.25)]'
+          ? isPotion
+            ? 'bg-emerald-900/80 border-emerald-400/70 shadow-[0_0_12px_rgba(74,222,128,0.45)] cursor-pointer active:scale-90'
+            : 'bg-stone-800/80 border-amber-600/60 shadow-[0_0_8px_rgba(217,119,6,0.25)]'
           : 'bg-stone-900/60 border-stone-700/50 border-dashed'
       )}
       style={{ transitionDelay: `${index * 30}ms` }}
@@ -205,32 +212,38 @@ function InventorySlot({ item, index }: InventorySlotProps) {
       ) : (
         <span className="text-[9px] text-stone-600 font-mono font-bold">{index + 1}</span>
       )}
+      {isPotion && (
+        <span className="absolute -bottom-3.5 left-1/2 -translate-x-1/2 text-[8px] text-emerald-400 font-mono font-bold whitespace-nowrap">
+          E / Tap
+        </span>
+      )}
     </div>
   );
 }
 
 interface InventoryBarProps {
   inventory: InventoryItem[];
+  onUsePotion?: () => void;
 }
 
-function InventoryBar({ inventory }: InventoryBarProps) {
+function InventoryBar({ inventory, onUsePotion }: InventoryBarProps) {
   const slots: (InventoryItem | undefined)[] = [];
   for (let i = 0; i < MAX_INVENTORY; i++) {
     slots.push(inventory[i]);
   }
 
   return (
-    <div className="absolute top-4 right-4 pointer-events-none select-none">
+    <div className="absolute top-4 right-4 select-none" style={{ pointerEvents: 'auto' }}>
       <div className="bg-stone-900/75 backdrop-blur-sm border border-stone-700/60 rounded-xl px-3 py-2.5 shadow-xl">
         <div className="flex items-center gap-1 mb-1.5">
           <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
           <span className="text-[10px] font-bold tracking-widest text-stone-400 uppercase">
-            Inventory
+            Rucksack
           </span>
         </div>
-        <div className="flex gap-1.5">
+        <div className="flex gap-1.5 pb-3">
           {slots.map((item, i) => (
-            <InventorySlot key={i} item={item} index={i} />
+            <InventorySlot key={i} item={item} index={i} onUsePotion={item === 'potion' ? onUsePotion : undefined} />
           ))}
         </div>
       </div>
@@ -382,9 +395,10 @@ interface HUDProps {
   nextLevelXp: number | null;
   minimapData: MinimapData | null;
   showHints: boolean;
+  onUsePotion?: () => void;
 }
 
-export function HUD({ hp, maxHp, isJumping, inventory, zone, xp, level, nextLevelXp, minimapData, showHints }: HUDProps) {
+export function HUD({ hp, maxHp, isJumping, inventory, zone, xp, level, nextLevelXp, minimapData, showHints, onUsePotion }: HUDProps) {
   const fullHearts = Math.floor(hp / 2);
   const hasHalf = hp % 2 === 1;
   const totalSlots = Math.ceil(maxHp / 2);
@@ -438,7 +452,7 @@ export function HUD({ hp, maxHp, isJumping, inventory, zone, xp, level, nextLeve
         </div>
       </div>
 
-      <InventoryBar inventory={inventory} />
+      <InventoryBar inventory={inventory} onUsePotion={onUsePotion} />
 
       <Minimap zone={zone} minimapData={minimapData} />
 

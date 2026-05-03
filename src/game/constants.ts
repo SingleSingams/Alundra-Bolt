@@ -9,6 +9,7 @@ export const JUMP_SCALE_PEAK = 1.18;
 
 export const MAX_HP = 6;
 export const HEART_HEAL_AMOUNT = 2;
+export const POTION_HEAL_AMOUNT = 4;
 
 export const CAMERA_LERP = 0.08;
 
@@ -58,6 +59,7 @@ export const GAME_EVENTS = {
   MINIMAP_UPDATE: 'minimap-update',
   LOADING_PROGRESS: 'loading-progress',
   LOADING_COMPLETE: 'loading-complete',
+  USE_POTION: 'use-potion',
 } as const;
 
 export interface MinimapDot {

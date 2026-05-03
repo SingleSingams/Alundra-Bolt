@@ -84,6 +84,10 @@ export function GameCanvas() {
   const handleLoadProgress = useCallback((v: number) => setLoadProgress(v), []);
   const handleLoadComplete = useCallback(() => setLoaded(true), []);
 
+  const handleUsePotion = useCallback(() => {
+    gameRef.current?.events.emit(GAME_EVENTS.USE_POTION);
+  }, []);
+
   const closeDialog = useCallback(() => {
     setDialog(null);
     gameRef.current?.events.emit(GAME_EVENTS.DIALOG_CLOSE);
@@ -187,6 +191,7 @@ export function GameCanvas() {
         nextLevelXp={nextLevelXp}
         minimapData={minimapData}
         showHints={settings.showHints}
+        onUsePotion={handleUsePotion}
       />
       {settings.showTouchControls && <TouchControls />}
       {levelUpNotice !== null && (

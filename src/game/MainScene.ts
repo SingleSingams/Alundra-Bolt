@@ -25,6 +25,7 @@ import {
   HEART_HEAL_AMOUNT,
   MAX_HP,
   MAX_INVENTORY,
+  POTION_HEAL_AMOUNT,
   InventoryItem,
   ZoneId,
   ZONES,
@@ -221,6 +222,7 @@ export class MainScene extends Phaser.Scene {
   private xp = 0;
   private level = 1;
   private minimapThrottle = 0;
+  private useItemKey!: Phaser.Input.Keyboard.Key;
 
   constructor() {
     super({ key: 'MainScene' });
@@ -275,6 +277,8 @@ export class MainScene extends Phaser.Scene {
       });
     }
 
+    this.useItemKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E);
+
     // React → Phaser: dialog close signal
     this.game.events.on(GAME_EVENTS.DIALOG_CLOSE, this.handleDialogClose, this);
     // Player damage → particles via game event
@@ -283,12 +287,15 @@ export class MainScene extends Phaser.Scene {
     this.game.events.on(GAME_EVENTS.SHIELD_BLOCK, this.onShieldBlock, this);
     // Attack sound on every swing
     this.game.events.on(GAME_EVENTS.PLAYER_ATTACK, () => SoundSystem.playAttack(), this);
+    // React → Phaser: use potion from inventory
+    this.game.events.on(GAME_EVENTS.USE_POTION, this.handleUsePotion, this);
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off(GAME_EVENTS.DIALOG_CLOSE, this.handleDialogClose, this);
       this.game.events.off(GAME_EVENTS.PLAYER_DAMAGED, this.onPlayerDamaged, this);
       this.game.events.off(GAME_EVENTS.SHIELD_BLOCK, this.onShieldBlock, this);
       this.game.events.off(GAME_EVENTS.PLAYER_ATTACK, undefined, this);
+      this.game.events.off(GAME_EVENTS.USE_POTION, this.handleUsePotion, this);
     });
   }
 
@@ -989,13 +996,19 @@ export class MainScene extends Phaser.Scene {
           const ix = item.x;
           const iy = item.y;
           const isPotion = item.itemType === 'potion_pickup';
-          const healAmt = isPotion ? 4 : HEART_HEAL_AMOUNT;
           item.collect(() => {
-            this.player.heal(healAmt);
-            SoundSystem.playHeal();
-            this.addToInventory(isPotion ? 'potion' : 'heart');
-            this.spawnParticleBurst(ix, iy, 0x4ade80, 8, 42, 400);
-            this.showDamageNumber(ix, iy - 8, healAmt, true);
+            if (isPotion) {
+              // Potions are stored in inventory; use them manually via E / tap
+              SoundSystem.playHeal();
+              this.addToInventory('potion');
+              this.spawnParticleBurst(ix, iy, 0x4ade80, 6, 36, 350);
+            } else {
+              this.player.heal(HEART_HEAL_AMOUNT);
+              SoundSystem.playHeal();
+              this.addToInventory('heart');
+              this.spawnParticleBurst(ix, iy, 0x4ade80, 8, 42, 400);
+              this.showDamageNumber(ix, iy - 8, HEART_HEAL_AMOUNT, true);
+            }
           });
         }
       }
@@ -1073,9 +1086,21 @@ export class MainScene extends Phaser.Scene {
 
   private applyChestReward(reward: InventoryItem): void {
     if (reward === 'heart') this.player.heal(HEART_HEAL_AMOUNT);
-    if (reward === 'potion') this.player.heal(4);
+    // Potions from chests are stored; player uses them manually via E / tap
     if (reward === 'shield_fragment') this.player.addShield();
     this.addToInventory(reward);
+  }
+
+  private handleUsePotion(): void {
+    const idx = this.inventory.indexOf('potion');
+    if (idx === -1 || this.player.getHp() >= MAX_HP) return;
+    this.inventory.splice(idx, 1);
+    this.player.heal(POTION_HEAL_AMOUNT);
+    SoundSystem.playHeal();
+    this.emitInventoryChange();
+    this.spawnParticleBurst(this.player.x, this.player.y, 0x4ade80, 10, 50, 450);
+    this.showDamageNumber(this.player.x, this.player.y - 20, POTION_HEAL_AMOUNT, true);
+    this.saveCurrentState();
   }
 
   // ─── Camera & depth ───────────────────────────────────────────────────────
@@ -1130,6 +1155,10 @@ export class MainScene extends Phaser.Scene {
 
     if (!this.isTransitioning && !this.player.isDialogActive()) {
       this.updateInteractions();
+    }
+
+    if (Phaser.Input.Keyboard.JustDown(this.useItemKey) && !this.player.isDialogActive()) {
+      this.handleUsePotion();
     }
 
     // Ambient camera breathing — very slow sin-wave follow offset
