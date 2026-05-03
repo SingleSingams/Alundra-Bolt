@@ -561,7 +561,7 @@ export class MainScene extends Phaser.Scene {
     for (const spawn of spawns) {
       const px = spawn.tx * TILE_SIZE + TILE_SIZE / 2;
       const py = spawn.ty * TILE_SIZE + TILE_SIZE / 2;
-      const enemy = new Enemy(this, px, py, spawn.axis);
+      const enemy = new Enemy(this, px, py, spawn.axis, this.level);
       this.enemies.push(enemy);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       this.physics.add.collider(enemy as any, this.obstacles);
@@ -755,7 +755,7 @@ export class MainScene extends Phaser.Scene {
       (_p, enemyObj) => {
         const enemy = enemyObj as Enemy;
         if (enemy.isDying()) return;
-        this.player.takeDamage(2);
+        this.player.takeDamage(enemy.getContactDamage());
       },
       undefined,
       this

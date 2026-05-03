@@ -1,6 +1,6 @@
 import * as Phaser from 'phaser';
 import { Player } from './Player';
-import { TILE_SIZE, ENEMY_MAX_HP, ENEMY_HIT_INVULN_MS, ENEMY_FLASH_MS } from './constants';
+import { TILE_SIZE, ENEMY_MAX_HP, ENEMY_HIT_INVULN_MS, ENEMY_FLASH_MS, ENEMY_HP_SCALE, ENEMY_DAMAGE_SCALE } from './constants';
 
 const CHASE_RANGE = 150;
 const LEASH_RANGE = 250;
@@ -21,15 +21,21 @@ export class Enemy extends Phaser.GameObjects.Container {
   private readonly patrolAxis: PatrolAxis;
   private patrolDir = 1;
   private alertVisible = false;
-  private hp: number = ENEMY_MAX_HP;
+  private hp: number;
+  private maxHp: number;
+  private contactDamage: number;
   private hitInvulnTimer = 0;
   private dying = false;
 
-  constructor(scene: Phaser.Scene, x: number, y: number, patrolAxis: PatrolAxis = 'x') {
+  constructor(scene: Phaser.Scene, x: number, y: number, patrolAxis: PatrolAxis = 'x', level = 1) {
     super(scene, x, y);
 
     this.patrolCenter = new Phaser.Math.Vector2(x, y);
     this.patrolAxis = patrolAxis;
+    const idx = Math.min(level - 1, ENEMY_HP_SCALE.length - 1);
+    this.maxHp = Math.round(ENEMY_MAX_HP * ENEMY_HP_SCALE[idx]);
+    this.hp = this.maxHp;
+    this.contactDamage = ENEMY_DAMAGE_SCALE[idx];
 
     this.ensureTextures(scene);
 
@@ -181,6 +187,10 @@ export class Enemy extends Phaser.GameObjects.Container {
 
   isDying(): boolean {
     return this.dying;
+  }
+
+  getContactDamage(): number {
+    return this.contactDamage;
   }
 
   takeDamage(amount: number, onDeath: (x: number, y: number) => void): boolean {
