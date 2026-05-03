@@ -24,6 +24,7 @@ import {
   CHEST_INTERACT_RADIUS,
   HEART_HEAL_AMOUNT,
   MAX_HP,
+  HAZARD_DAMAGE_INTERVAL,
   MAX_INVENTORY,
   POTION_HEAL_AMOUNT,
   InventoryItem,
@@ -55,11 +56,14 @@ const TRANSITION_ZONE_THICKNESS = TRANSITION_EDGE_TILES * TILE_SIZE;
 
 type EdgeDirection = 'east' | 'west';
 
+type HazardType = 'thorns' | 'lava';
+
 interface ZoneConfig {
   numTrees: number;
   obstacleDensity: number;
   enemySpawns: Array<{ tx: number; ty: number; axis: PatrolAxis; type?: EnemyType }>;
   heartSpawns: Array<{ tx: number; ty: number }>;
+  hazardSpawns?: Array<{ tx: number; ty: number; kind: HazardType }>;
   npcs: NPCDefinition[];
   transitions: Partial<Record<EdgeDirection, ZoneId>>;
   bossSpawn?: { tx: number; ty: number };
@@ -151,6 +155,11 @@ const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
       { tx: 14, ty: 30, axis: 'x' },
     ],
     heartSpawns: [{ tx: 30, ty: 46 }],
+    hazardSpawns: [
+      { tx: 24, ty: 24, kind: 'thorns' }, { tx: 25, ty: 24, kind: 'thorns' },
+      { tx: 36, ty: 36, kind: 'thorns' }, { tx: 37, ty: 36, kind: 'thorns' },
+      { tx: 24, ty: 36, kind: 'thorns' }, { tx: 36, ty: 24, kind: 'thorns' },
+    ],
     npcs: [
       {
         id: 'arwen',
@@ -180,6 +189,13 @@ const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
       { tx: 30, ty: 42, axis: 'y', type: 'speedrunner' },
     ],
     heartSpawns: [{ tx: 30, ty: 30 }],
+    hazardSpawns: [
+      { tx: 20, ty: 20, kind: 'thorns' }, { tx: 21, ty: 20, kind: 'thorns' },
+      { tx: 39, ty: 20, kind: 'thorns' }, { tx: 40, ty: 20, kind: 'thorns' },
+      { tx: 20, ty: 40, kind: 'thorns' }, { tx: 21, ty: 40, kind: 'thorns' },
+      { tx: 39, ty: 40, kind: 'thorns' }, { tx: 40, ty: 40, kind: 'thorns' },
+      { tx: 30, ty: 26, kind: 'thorns' }, { tx: 30, ty: 34, kind: 'thorns' },
+    ],
     npcs: [],
     transitions: { west: 'dungeon', east: 'boss_room' },
   },
@@ -193,6 +209,12 @@ const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
       { tx: 46, ty: 46, axis: 'x', type: 'shielder' },
     ],
     heartSpawns: [],
+    hazardSpawns: [
+      { tx: 22, ty: 22, kind: 'lava' }, { tx: 23, ty: 22, kind: 'lava' },
+      { tx: 37, ty: 22, kind: 'lava' }, { tx: 38, ty: 22, kind: 'lava' },
+      { tx: 22, ty: 38, kind: 'lava' }, { tx: 23, ty: 38, kind: 'lava' },
+      { tx: 37, ty: 38, kind: 'lava' }, { tx: 38, ty: 38, kind: 'lava' },
+    ],
     npcs: [],
     bossSpawn: { tx: 30, ty: 30 },
     transitions: { west: 'dungeon_interior' },
@@ -209,6 +231,8 @@ export class MainScene extends Phaser.Scene {
   private groundLayer!: Phaser.Tilemaps.TilemapLayer;
   private obstacles!: Phaser.Physics.Arcade.StaticGroup;
   private treeObstacles!: Phaser.Physics.Arcade.StaticGroup;
+  private hazardGroup!: Phaser.Physics.Arcade.StaticGroup;
+  private hazardCooldown = 0;
 
   private inventory: InventoryItem[] = [];
   private activeChest: Item | null = null;
@@ -244,11 +268,13 @@ export class MainScene extends Phaser.Scene {
     this.buildTilemap();
     this.createObstacleTextures();
     this.createParticleTexture();
+    this.createHazardTextures();
     Item.ensureTextures(this);
     NPC.ensureTextures(this);
 
     this.obstacles = this.physics.add.staticGroup();
     this.treeObstacles = this.physics.add.staticGroup();
+    this.hazardGroup = this.physics.add.staticGroup();
     this.treeGroup = this.add.group();
 
     this.player = new Player(this, centerX, centerY);
@@ -367,6 +393,45 @@ export class MainScene extends Phaser.Scene {
       gfx.fillRect(0, 0, 5, 5);
       gfx.generateTexture('particle-sq', 5, 5);
       gfx.destroy();
+    }
+  }
+
+  // ─── Hazards ──────────────────────────────────────────────────────────────
+
+  private createHazardTextures(): void {
+    if (!this.textures.exists('hazard-thorns')) {
+      const g = this.add.graphics();
+      const s = TILE_SIZE;
+      g.fillStyle(0x14532d, 1); g.fillRect(0, 0, s, s);
+      g.fillStyle(0x166534, 1);
+      for (let i = 0; i < 5; i++) {
+        const cx = 6 + i * 5;
+        g.fillTriangle(cx, 4, cx - 3, s - 4, cx + 3, s - 4);
+      }
+      g.fillStyle(0x4ade80, 0.6);
+      g.fillRect(0, 0, s, 3);
+      g.generateTexture('hazard-thorns', s, s);
+      g.destroy();
+    }
+    if (!this.textures.exists('hazard-lava')) {
+      const g = this.add.graphics();
+      const s = TILE_SIZE;
+      g.fillStyle(0x7c2d12, 1); g.fillRect(0, 0, s, s);
+      g.fillStyle(0xf97316, 0.8); g.fillEllipse(s / 2, s / 2, s - 6, s - 10);
+      g.fillStyle(0xfef3c7, 0.45); g.fillEllipse(s / 2, s / 2 - 2, s * 0.4, s * 0.25);
+      g.generateTexture('hazard-lava', s, s);
+      g.destroy();
+    }
+  }
+
+  private spawnHazards(spawns: NonNullable<ZoneConfig['hazardSpawns']>): void {
+    for (const h of spawns) {
+      const px = h.tx * TILE_SIZE + TILE_SIZE / 2;
+      const py = h.ty * TILE_SIZE + TILE_SIZE / 2;
+      const key = h.kind === 'lava' ? 'hazard-lava' : 'hazard-thorns';
+      const tile = this.hazardGroup.create(px, py, key) as Phaser.Physics.Arcade.Image;
+      tile.setDepth(0.5);
+      tile.refreshBody();
     }
   }
 
@@ -511,6 +576,7 @@ export class MainScene extends Phaser.Scene {
     this.placeObstacles(config.obstacleDensity, protectedTiles);
     this.spawnEnemies(config.enemySpawns);
     this.spawnInitialItems(config.heartSpawns);
+    if (config.hazardSpawns) this.spawnHazards(config.hazardSpawns);
     this.spawnNPCs(config.npcs);
     if (config.bossSpawn) {
       this.spawnBoss(config.bossSpawn.tx, config.bossSpawn.ty);
@@ -556,6 +622,7 @@ export class MainScene extends Phaser.Scene {
     this.treeGroup.clear(true, true);
     this.obstacles.clear(true, true);
     this.treeObstacles.clear(true, true);
+    this.hazardGroup.clear(true, true);
 
     this.activeChest = null;
     this.activeNpc = null;
@@ -756,6 +823,19 @@ export class MainScene extends Phaser.Scene {
   private setupPersistentColliders(): void {
     this.physics.add.collider(this.player, this.obstacles);
     this.physics.add.collider(this.player, this.treeObstacles);
+
+    this.physics.add.overlap(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      this.player as any,
+      this.hazardGroup,
+      () => {
+        if (this.hazardCooldown > 0) return;
+        this.player.takeDamage(1);
+        this.hazardCooldown = HAZARD_DAMAGE_INTERVAL;
+      },
+      undefined,
+      this
+    );
 
     this.physics.add.overlap(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1180,6 +1260,7 @@ export class MainScene extends Phaser.Scene {
   // ─── Game loop ────────────────────────────────────────────────────────────
 
   update(_time: number, delta: number): void {
+    if (this.hazardCooldown > 0) this.hazardCooldown = Math.max(0, this.hazardCooldown - delta);
     this.player.update(delta);
     this.player.setDepth(this.player.y + 1);
 

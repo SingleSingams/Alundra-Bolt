@@ -36,6 +36,7 @@ export const ENEMY_MAX_HP = 4;
 export const ENEMY_HIT_INVULN_MS = 240;
 export const ENEMY_FLASH_MS = 55;
 export const CHEST_DROP_CHANCE = 0.5;
+export const HAZARD_DAMAGE_INTERVAL = 1000;
 
 // Multipliers indexed by (level - 1): HP and contact damage scale with player level
 export const ENEMY_HP_SCALE    = [1, 1, 1.25, 1.5, 1.75, 2] as const;
