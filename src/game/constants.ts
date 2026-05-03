@@ -25,6 +25,12 @@ export const ATTACK_OFFSET = 18;
 export const ATTACK_DAMAGE = 2;
 export const PROJECTILE_DAMAGE = 1;
 
+export const XP_PER_ENEMY = 5;
+export const XP_PER_BOSS = 50;
+export const MAX_LEVEL = 6;
+// Cumulative XP thresholds to reach levels 2–6
+export const XP_THRESHOLDS = [10, 30, 60, 100, 150] as const;
+
 export const ENEMY_MAX_HP = 4;
 export const ENEMY_HIT_INVULN_MS = 240;
 export const ENEMY_FLASH_MS = 55;
@@ -47,6 +53,8 @@ export const GAME_EVENTS = {
   SAVE_LOADED: 'save-loaded',
   GAME_OVER: 'game-over',
   SHIELD_BLOCK: 'shield-block',
+  XP_CHANGE: 'xp-change',
+  LEVEL_UP: 'level-up',
 } as const;
 
 export type InventoryItem = 'heart' | 'sword_upgrade' | 'potion' | 'shield_fragment';

@@ -4,6 +4,8 @@ interface SaveData {
   hp: number;
   zone: ZoneId;
   inventory: InventoryItem[];
+  xp: number;
+  level: number;
   savedAt: number;
 }
 
@@ -22,7 +24,15 @@ export const SaveSystem = {
     try {
       const raw = localStorage.getItem(SAVE_KEY);
       if (!raw) return null;
-      return JSON.parse(raw) as SaveData;
+      const parsed = JSON.parse(raw) as Partial<SaveData>;
+      return {
+        hp: parsed.hp ?? 6,
+        zone: parsed.zone ?? 'grasslands',
+        inventory: parsed.inventory ?? [],
+        xp: parsed.xp ?? 0,
+        level: parsed.level ?? 1,
+        savedAt: parsed.savedAt ?? 0,
+      };
     } catch {
       return null;
     }
