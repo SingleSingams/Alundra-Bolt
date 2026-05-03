@@ -35,6 +35,7 @@ import {
   XP_PER_BOSS,
   MAX_LEVEL,
   XP_THRESHOLDS,
+  MinimapData,
 } from './constants';
 import { SaveSystem } from './SaveSystem';
 import { Boss } from './Boss';
@@ -219,6 +220,7 @@ export class MainScene extends Phaser.Scene {
   private projectiles: Projectile[] = [];
   private xp = 0;
   private level = 1;
+  private minimapThrottle = 0;
 
   constructor() {
     super({ key: 'MainScene' });
@@ -893,6 +895,26 @@ export class MainScene extends Phaser.Scene {
     this.scene.pause();
   }
 
+  // ─── Minimap ──────────────────────────────────────────────────────────────
+
+  private emitMinimapUpdate(): void {
+    const sx = 1 / WORLD_WIDTH;
+    const sy = 1 / WORLD_HEIGHT;
+    const data: MinimapData = {
+      player: { nx: this.player.x * sx, ny: this.player.y * sy },
+      enemies: this.enemies
+        .filter(e => e.active && !e.isDying())
+        .map(e => ({ nx: e.x * sx, ny: e.y * sy })),
+      boss: (this.boss && this.boss.active && !this.boss.isDying())
+        ? { nx: this.boss.x * sx, ny: this.boss.y * sy } : null,
+      chests: this.items
+        .filter(i => i.active && i.itemType === 'chest' && !i.isOpened())
+        .map(i => ({ nx: i.x * sx, ny: i.y * sy })),
+      zone: this.currentZone,
+    };
+    this.game.events.emit(GAME_EVENTS.MINIMAP_UPDATE, data);
+  }
+
   // ─── Save / Load ──────────────────────────────────────────────────────────
 
   private saveCurrentState(): void {
@@ -1113,5 +1135,12 @@ export class MainScene extends Phaser.Scene {
     // Ambient camera breathing — very slow sin-wave follow offset
     this.ambientBreathTime += delta * 0.00055;
     this.cameras.main.setFollowOffset(0, Math.sin(this.ambientBreathTime) * 1.2);
+
+    // Minimap: throttled to ~10 fps
+    this.minimapThrottle += delta;
+    if (this.minimapThrottle >= 100) {
+      this.minimapThrottle = 0;
+      this.emitMinimapUpdate();
+    }
   }
 }

@@ -55,7 +55,21 @@ export const GAME_EVENTS = {
   SHIELD_BLOCK: 'shield-block',
   XP_CHANGE: 'xp-change',
   LEVEL_UP: 'level-up',
+  MINIMAP_UPDATE: 'minimap-update',
 } as const;
+
+export interface MinimapDot {
+  nx: number;
+  ny: number;
+}
+
+export interface MinimapData {
+  player: MinimapDot;
+  enemies: MinimapDot[];
+  boss: MinimapDot | null;
+  chests: MinimapDot[];
+  zone: ZoneId;
+}
 
 export type InventoryItem = 'heart' | 'sword_upgrade' | 'potion' | 'shield_fragment';
 

@@ -8,10 +8,12 @@ import {
   ZoneId,
   DialogPayload,
   XP_THRESHOLDS,
+  MinimapData,
 } from '../game/constants';
 import { HUD } from './HUD';
 import { DialogBox } from './DialogBox';
 import { GameOverScreen } from './GameOverScreen';
+import { PauseMenu } from './PauseMenu';
 
 export function GameCanvas() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -27,6 +29,8 @@ export function GameCanvas() {
   const [level, setLevel] = useState(1);
   const [nextLevelXp, setNextLevelXp] = useState<number | null>(XP_THRESHOLDS[0]);
   const [levelUpNotice, setLevelUpNotice] = useState<number | null>(null);
+  const [minimapData, setMinimapData] = useState<MinimapData | null>(null);
+  const [paused, setPaused] = useState(false);
 
   const handleHpChange = useCallback((newHp: number) => setHp(newHp), []);
   const handleJump = useCallback(() => setIsJumping(true), []);
@@ -57,6 +61,7 @@ export function GameCanvas() {
     setLevelUpNotice(newLevel);
     setTimeout(() => setLevelUpNotice(null), 2200);
   }, []);
+  const handleMinimapUpdate = useCallback((data: MinimapData) => setMinimapData(data), []);
 
   const closeDialog = useCallback(() => {
     setDialog(null);
@@ -80,6 +85,7 @@ export function GameCanvas() {
     game.events.on(GAME_EVENTS.GAME_OVER, handleGameOver);
     game.events.on(GAME_EVENTS.XP_CHANGE, handleXpChange);
     game.events.on(GAME_EVENTS.LEVEL_UP, handleLevelUp);
+    game.events.on(GAME_EVENTS.MINIMAP_UPDATE, handleMinimapUpdate);
 
     return () => {
       game.events.off(GAME_EVENTS.HP_CHANGE, handleHpChange);
@@ -92,6 +98,7 @@ export function GameCanvas() {
       game.events.off(GAME_EVENTS.GAME_OVER, handleGameOver);
       game.events.off(GAME_EVENTS.XP_CHANGE, handleXpChange);
       game.events.off(GAME_EVENTS.LEVEL_UP, handleLevelUp);
+      game.events.off(GAME_EVENTS.MINIMAP_UPDATE, handleMinimapUpdate);
       game.destroy(true);
       gameRef.current = null;
     };
@@ -106,7 +113,30 @@ export function GameCanvas() {
     handleGameOver,
     handleXpChange,
     handleLevelUp,
+    handleMinimapUpdate,
   ]);
+
+  // ESC key → pause toggle (skip during dialog or game over)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !gameOver) {
+        setPaused(p => !p);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [gameOver]);
+
+  // Sync pause state to Phaser scene
+  useEffect(() => {
+    const game = gameRef.current;
+    if (!game) return;
+    if (paused) {
+      game.scene.pause('MainScene');
+    } else {
+      game.scene.resume('MainScene');
+    }
+  }, [paused]);
 
   return (
     <div className="relative w-full h-full">
@@ -128,6 +158,7 @@ export function GameCanvas() {
         xp={xp}
         level={level}
         nextLevelXp={nextLevelXp}
+        minimapData={minimapData}
       />
       {levelUpNotice !== null && (
         <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-50 text-center animate-in fade-in zoom-in duration-300">
@@ -153,6 +184,7 @@ export function GameCanvas() {
         onClose={closeDialog}
       />
       <GameOverScreen isOpen={gameOver} />
+      <PauseMenu isOpen={paused && !gameOver} onResume={() => setPaused(false)} />
     </div>
   );
 }
