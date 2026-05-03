@@ -14,6 +14,7 @@ import {
 } from '../game/constants';
 import { SoundSystem } from '../game/SoundSystem';
 import { SettingsSystem, Settings } from '../game/SettingsSystem';
+import { SaveSystem } from '../game/SaveSystem';
 import { HUD } from './HUD';
 import { DialogBox } from './DialogBox';
 import { GameOverScreen } from './GameOverScreen';
@@ -21,6 +22,7 @@ import { PauseMenu } from './PauseMenu';
 import { TouchControls } from './TouchControls';
 import { LoadingScreen } from './LoadingScreen';
 import { SkillChoiceScreen } from './SkillChoiceScreen';
+import { MainMenuScreen } from './MainMenuScreen';
 
 export function GameCanvas() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -44,6 +46,7 @@ export function GameCanvas() {
   const [settings, setSettings] = useState<Settings>(() => SettingsSystem.load());
   const [loadProgress, setLoadProgress] = useState(0);
   const [loaded, setLoaded] = useState(false);
+  const [gameStarted, setGameStarted] = useState(false);
 
   const handleSettingsChange = useCallback((s: Settings) => {
     setSettings(s);
@@ -115,8 +118,17 @@ export function GameCanvas() {
     gameRef.current?.events.emit(GAME_EVENTS.DIALOG_CLOSE);
   }, []);
 
+  const handleNewGame = useCallback(() => {
+    SaveSystem.clear();
+    setGameStarted(true);
+  }, []);
+
+  const handleContinue = useCallback(() => {
+    setGameStarted(true);
+  }, []);
+
   useEffect(() => {
-    if (!containerRef.current || gameRef.current) return;
+    if (!gameStarted || !containerRef.current || gameRef.current) return;
 
     const config = createGameConfig(containerRef.current);
     const game = new Phaser.Game(config);
@@ -176,6 +188,7 @@ export function GameCanvas() {
     handleShieldChange,
     handleBossHp,
     handleLevelUpChoice,
+    gameStarted,
   ]);
 
   // ESC key → pause toggle (skip during game over)
@@ -203,6 +216,9 @@ export function GameCanvas() {
   return (
     <div className="relative w-full h-full">
       <div ref={containerRef} className="w-full h-full" />
+      {!gameStarted && (
+        <MainMenuScreen onNewGame={handleNewGame} onContinue={handleContinue} />
+      )}
       {/* Vignette */}
       <div
         className="absolute inset-0 pointer-events-none"
