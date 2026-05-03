@@ -6,9 +6,11 @@ const PROJECTILE_LIFETIME = 1100;
 export class Projectile extends Phaser.GameObjects.Image {
   private lifetime = PROJECTILE_LIFETIME;
   private spent = false;
+  readonly isEnemyProjectile: boolean;
 
-  constructor(scene: Phaser.Scene, x: number, y: number, angleDeg: number) {
-    super(scene, x, y, 'projectile');
+  constructor(scene: Phaser.Scene, x: number, y: number, angleDeg: number, isEnemy = false) {
+    super(scene, x, y, isEnemy ? 'projectile-enemy' : 'projectile');
+    this.isEnemyProjectile = isEnemy;
 
     scene.add.existing(this);
     scene.physics.add.existing(this);
@@ -23,18 +25,28 @@ export class Projectile extends Phaser.GameObjects.Image {
   }
 
   static ensureTexture(scene: Phaser.Scene): void {
-    if (scene.textures.exists('projectile')) return;
-    const g = scene.add.graphics();
-    // Outer glow
-    g.fillStyle(0xfbbf24, 0.55);
-    g.fillCircle(8, 8, 8);
-    // Core
-    g.fillStyle(0xfef3c7, 1);
-    g.fillCircle(8, 8, 5);
-    g.fillStyle(0xfde68a, 1);
-    g.fillCircle(8, 8, 3);
-    g.generateTexture('projectile', 16, 16);
-    g.destroy();
+    if (!scene.textures.exists('projectile')) {
+      const g = scene.add.graphics();
+      g.fillStyle(0xfbbf24, 0.55);
+      g.fillCircle(8, 8, 8);
+      g.fillStyle(0xfef3c7, 1);
+      g.fillCircle(8, 8, 5);
+      g.fillStyle(0xfde68a, 1);
+      g.fillCircle(8, 8, 3);
+      g.generateTexture('projectile', 16, 16);
+      g.destroy();
+    }
+    if (!scene.textures.exists('projectile-enemy')) {
+      const g = scene.add.graphics();
+      g.fillStyle(0x9333ea, 0.55);
+      g.fillCircle(8, 8, 8);
+      g.fillStyle(0xe879f9, 1);
+      g.fillCircle(8, 8, 5);
+      g.fillStyle(0xf0abfc, 1);
+      g.fillCircle(8, 8, 3);
+      g.generateTexture('projectile-enemy', 16, 16);
+      g.destroy();
+    }
   }
 
   update(delta: number): void {

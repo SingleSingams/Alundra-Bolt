@@ -21,6 +21,8 @@ export class Boss extends Phaser.GameObjects.Container {
   private dying = false;
   private speed = BOSS_SPEED_P1;
   private phaseTriggered = false;
+  private shootCooldown = 0;
+  private readonly SHOOT_INTERVAL = 2200;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     super(scene, x, y);
@@ -145,7 +147,24 @@ export class Boss extends Phaser.GameObjects.Container {
       body.setVelocity((dx / len) * this.speed, (dy / len) * this.speed);
     }
 
+    if (this.phase === 2) {
+      this.shootCooldown = Math.max(0, this.shootCooldown - delta);
+    }
+
     this.setDepth(this.y + 1);
+  }
+
+  wantsShoot(): boolean {
+    return this.phase === 2 && !this.dying && this.shootCooldown <= 0;
+  }
+
+  markShot(): void {
+    this.shootCooldown = this.SHOOT_INTERVAL;
+  }
+
+  getShootAngles(playerX: number, playerY: number): number[] {
+    const base = Math.atan2(playerY - this.y, playerX - this.x) * (180 / Math.PI);
+    return [base - 25, base, base + 25];
   }
 
   emitHp(): void {

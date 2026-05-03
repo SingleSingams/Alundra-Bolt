@@ -644,14 +644,14 @@ export class MainScene extends Phaser.Scene {
       }
     );
 
-    // Projectile ↔ boss
+    // Player projectiles ↔ boss
     this.physics.add.overlap(
       this.projectiles as unknown as Phaser.GameObjects.GameObject[],
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       this.boss as any,
       (projObj) => {
         const proj = projObj as Projectile;
-        if (proj.isSpent() || !this.boss?.canBeHit()) return;
+        if (proj.isSpent() || proj.isEnemyProjectile || !this.boss?.canBeHit()) return;
         proj.hit();
         const died = this.boss.takeDamage(PROJECTILE_DAMAGE, (bx, by) => this.onBossDeath(bx, by));
         if (!died) {
@@ -779,18 +779,33 @@ export class MainScene extends Phaser.Scene {
       this
     );
 
-    // Projectile ↔ enemy overlap (uses live array reference)
+    // Player projectiles ↔ enemies
     this.physics.add.overlap(
       this.projectiles as unknown as Phaser.GameObjects.GameObject[],
       this.enemies as unknown as Phaser.GameObjects.GameObject[],
       (projObj, enemyObj) => {
         const proj = projObj as Projectile;
         const enemy = enemyObj as Enemy;
-        if (proj.isSpent() || !enemy.canBeHit()) return;
+        if (proj.isSpent() || proj.isEnemyProjectile || !enemy.canBeHit()) return;
         proj.hit();
         enemy.takeDamage(PROJECTILE_DAMAGE, (ex, ey) => this.onEnemyDeath(ex, ey));
         this.spawnParticleBurst(enemy.x, enemy.y, 0xfbbf24, 5, 40, 280);
         this.showDamageNumber(enemy.x, enemy.y - 10, PROJECTILE_DAMAGE, false);
+      },
+      undefined,
+      this
+    );
+
+    // Enemy projectiles ↔ player
+    this.physics.add.overlap(
+      this.projectiles as unknown as Phaser.GameObjects.GameObject[],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      this.player as any,
+      (projObj) => {
+        const proj = projObj as Projectile;
+        if (proj.isSpent() || !proj.isEnemyProjectile) return;
+        proj.hit();
+        this.player.takeDamage(1);
       },
       undefined,
       this
@@ -1140,6 +1155,15 @@ export class MainScene extends Phaser.Scene {
 
     if (this.boss?.active) {
       this.boss.update(this.player.x, this.player.y, delta);
+      if (this.boss.wantsShoot()) {
+        const angles = this.boss.getShootAngles(this.player.x, this.player.y);
+        for (const angle of angles) {
+          const proj = new Projectile(this, this.boss.x, this.boss.y, angle, true);
+          this.projectiles.push(proj);
+        }
+        this.boss.markShot();
+        SoundSystem.playProjectile();
+      }
     }
 
     // Update and prune projectiles
