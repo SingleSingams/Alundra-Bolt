@@ -37,6 +37,7 @@ import {
   MAX_LEVEL,
   XP_THRESHOLDS,
   MinimapData,
+  LevelUpSkill,
 } from './constants';
 import { SaveSystem } from './SaveSystem';
 import { Boss } from './Boss';
@@ -293,6 +294,8 @@ export class MainScene extends Phaser.Scene {
     this.game.events.on(GAME_EVENTS.PLAYER_ATTACK, () => SoundSystem.playAttack(), this);
     // React → Phaser: use potion from inventory
     this.game.events.on(GAME_EVENTS.USE_POTION, this.handleUsePotion, this);
+    // React → Phaser: skill chosen at level-up
+    this.game.events.on(GAME_EVENTS.LEVEL_UP_CHOSEN, this.handleSkillChosen, this);
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off(GAME_EVENTS.DIALOG_CLOSE, this.handleDialogClose, this);
@@ -300,6 +303,7 @@ export class MainScene extends Phaser.Scene {
       this.game.events.off(GAME_EVENTS.SHIELD_BLOCK, this.onShieldBlock, this);
       this.game.events.off(GAME_EVENTS.PLAYER_ATTACK, undefined, this);
       this.game.events.off(GAME_EVENTS.USE_POTION, this.handleUsePotion, this);
+      this.game.events.off(GAME_EVENTS.LEVEL_UP_CHOSEN, this.handleSkillChosen, this);
     });
   }
 
@@ -986,6 +990,35 @@ export class MainScene extends Phaser.Scene {
     this.spawnParticleBurst(this.player.x, this.player.y, 0xfde68a, 16, 80, 500);
     this.spawnParticleBurst(this.player.x, this.player.y, 0x4ade80, 12, 60, 400);
     this.cameras.main.shake(200, 0.006);
+    this.saveCurrentState();
+
+    const allSkills: LevelUpSkill[] = ['hp_up', 'attack_up', 'shield', 'xp_boost', 'speed_up'];
+    const shuffled = allSkills.sort(() => Math.random() - 0.5);
+    const choices = shuffled.slice(0, 3);
+    this.scene.pause();
+    this.game.events.emit(GAME_EVENTS.LEVEL_UP_CHOICE, { skills: choices });
+  }
+
+  private handleSkillChosen(skill: LevelUpSkill): void {
+    this.scene.resume();
+    switch (skill) {
+      case 'hp_up':
+        this.player.setHp(Math.min(MAX_HP + 2, this.player.getHp() + 2));
+        break;
+      case 'attack_up':
+        this.currentAttackDamage += 2;
+        break;
+      case 'shield':
+        this.player.addShield();
+        break;
+      case 'xp_boost':
+        this.gainXp(20);
+        break;
+      case 'speed_up':
+        this.player.applySpeedBoost(1.15);
+        break;
+    }
+    this.spawnParticleBurst(this.player.x, this.player.y, 0xfde68a, 18, 90, 550);
     this.saveCurrentState();
   }
 

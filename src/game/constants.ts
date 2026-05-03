@@ -66,7 +66,15 @@ export const GAME_EVENTS = {
   USE_POTION: 'use-potion',
   SHIELD_CHANGE: 'shield-change',
   BOSS_HP: 'boss-hp',
+  LEVEL_UP_CHOICE: 'level-up-choice',
+  LEVEL_UP_CHOSEN: 'level-up-chosen',
 } as const;
+
+export type LevelUpSkill = 'hp_up' | 'attack_up' | 'shield' | 'xp_boost' | 'speed_up';
+
+export interface LevelUpChoice {
+  skills: LevelUpSkill[];
+}
 
 export interface MinimapDot {
   nx: number;

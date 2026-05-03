@@ -9,6 +9,8 @@ import {
   DialogPayload,
   XP_THRESHOLDS,
   MinimapData,
+  LevelUpSkill,
+  LevelUpChoice,
 } from '../game/constants';
 import { SoundSystem } from '../game/SoundSystem';
 import { SettingsSystem, Settings } from '../game/SettingsSystem';
@@ -18,6 +20,7 @@ import { GameOverScreen } from './GameOverScreen';
 import { PauseMenu } from './PauseMenu';
 import { TouchControls } from './TouchControls';
 import { LoadingScreen } from './LoadingScreen';
+import { SkillChoiceScreen } from './SkillChoiceScreen';
 
 export function GameCanvas() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -36,6 +39,7 @@ export function GameCanvas() {
   const [minimapData, setMinimapData] = useState<MinimapData | null>(null);
   const [shieldCharges, setShieldCharges] = useState(0);
   const [bossHp, setBossHp] = useState<{ hp: number; maxHp: number; phase: number } | null>(null);
+  const [skillChoice, setSkillChoice] = useState<{ level: number; skills: LevelUpSkill[] } | null>(null);
   const [paused, setPaused] = useState(false);
   const [settings, setSettings] = useState<Settings>(() => SettingsSystem.load());
   const [loadProgress, setLoadProgress] = useState(0);
@@ -82,6 +86,10 @@ export function GameCanvas() {
     setLevelUpNotice(newLevel);
     setTimeout(() => setLevelUpNotice(null), 2200);
   }, []);
+  const handleLevelUpChoice = useCallback((data: LevelUpChoice) => {
+    setSkillChoice({ level: level, skills: data.skills });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [level]);
   const handleMinimapUpdate = useCallback((data: MinimapData) => setMinimapData(data), []);
   const handleLoadProgress = useCallback((v: number) => setLoadProgress(v), []);
   const handleLoadComplete = useCallback(() => setLoaded(true), []);
@@ -95,6 +103,11 @@ export function GameCanvas() {
 
   const handleUsePotion = useCallback(() => {
     gameRef.current?.events.emit(GAME_EVENTS.USE_POTION);
+  }, []);
+
+  const handleSkillChosen = useCallback((skill: LevelUpSkill) => {
+    setSkillChoice(null);
+    gameRef.current?.events.emit(GAME_EVENTS.LEVEL_UP_CHOSEN, skill);
   }, []);
 
   const closeDialog = useCallback(() => {
@@ -124,6 +137,7 @@ export function GameCanvas() {
     game.events.on(GAME_EVENTS.LOADING_COMPLETE, handleLoadComplete);
     game.events.on(GAME_EVENTS.SHIELD_CHANGE, handleShieldChange);
     game.events.on(GAME_EVENTS.BOSS_HP, handleBossHp);
+    game.events.on(GAME_EVENTS.LEVEL_UP_CHOICE, handleLevelUpChoice);
 
     return () => {
       game.events.off(GAME_EVENTS.HP_CHANGE, handleHpChange);
@@ -141,6 +155,7 @@ export function GameCanvas() {
       game.events.off(GAME_EVENTS.LOADING_COMPLETE, handleLoadComplete);
       game.events.off(GAME_EVENTS.SHIELD_CHANGE, handleShieldChange);
       game.events.off(GAME_EVENTS.BOSS_HP, handleBossHp);
+      game.events.off(GAME_EVENTS.LEVEL_UP_CHOICE, handleLevelUpChoice);
       game.destroy(true);
       gameRef.current = null;
     };
@@ -160,6 +175,7 @@ export function GameCanvas() {
     handleLoadComplete,
     handleShieldChange,
     handleBossHp,
+    handleLevelUpChoice,
   ]);
 
   // ESC key → pause toggle (skip during game over)
@@ -236,6 +252,13 @@ export function GameCanvas() {
       />
       <GameOverScreen isOpen={gameOver} level={level} xp={xp} zone={zone} />
       {!loaded && <LoadingScreen progress={loadProgress} />}
+      {skillChoice && (
+        <SkillChoiceScreen
+          level={skillChoice.level}
+          skills={skillChoice.skills}
+          onChoose={handleSkillChosen}
+        />
+      )}
       <PauseMenu
         isOpen={paused && !gameOver}
         onResume={() => setPaused(false)}

@@ -69,6 +69,7 @@ export class Player extends Phaser.GameObjects.Container {
   private shieldCharges = 0;
 
   private zoneBobMult = 1.0;
+  private speedMult = 1.0;
 
   // Cached per-frame key states — JustDown consumes the flag on first call,
   // so we read it exactly once per key per frame and share the result.
@@ -193,8 +194,9 @@ export class Player extends Phaser.GameObjects.Container {
 
     if (vx !== 0 || vy !== 0) {
       const len = Math.sqrt(vx * vx + vy * vy);
-      vx = (vx / len) * PLAYER_SPEED;
-      vy = (vy / len) * PLAYER_SPEED;
+      const spd = PLAYER_SPEED * this.speedMult;
+      vx = (vx / len) * spd;
+      vy = (vy / len) * spd;
 
       if (goUp && goRight) this.facing = 'ne';
       else if (goDown && goRight) this.facing = 'se';
@@ -492,6 +494,10 @@ export class Player extends Phaser.GameObjects.Container {
         this.sprite.setScale(1);
       }
     }
+  }
+
+  applySpeedBoost(mult: number): void {
+    this.speedMult *= mult;
   }
 
   setFrozen(value: boolean): void {
