@@ -191,11 +191,18 @@ export function GameCanvas() {
     gameStarted,
   ]);
 
-  // ESC key → pause toggle (skip during game over)
+  // ESC / P key → pause toggle; F key → fullscreen (skip during game over)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !gameOver) {
+      if ((e.key === 'Escape' || e.key === 'p' || e.key === 'P') && !gameOver) {
         setPaused(p => !p);
+      }
+      if (e.key === 'f' || e.key === 'F') {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen().catch(() => {});
+        } else {
+          document.exitFullscreen().catch(() => {});
+        }
       }
     };
     window.addEventListener('keydown', onKey);

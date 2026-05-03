@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { SaveSystem } from '../game/SaveSystem';
 import { Settings } from '../game/SettingsSystem';
 
@@ -9,7 +10,23 @@ interface PauseMenuProps {
 }
 
 export function PauseMenu({ isOpen, onResume, settings, onSettingsChange }: PauseMenuProps) {
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const onFsChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', onFsChange);
+    return () => document.removeEventListener('fullscreenchange', onFsChange);
+  }, []);
+
   if (!isOpen) return null;
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    } else {
+      document.exitFullscreen().catch(() => {});
+    }
+  };
 
   const handleNewGame = () => {
     if (window.confirm('Spielstand löschen und neu starten?')) {
@@ -93,6 +110,12 @@ export function PauseMenu({ isOpen, onResume, settings, onSettingsChange }: Paus
             className="px-6 py-2.5 bg-amber-600 hover:bg-amber-500 active:bg-amber-700 text-stone-900 font-bold rounded-lg transition-colors tracking-wide text-sm"
           >
             Fortfahren
+          </button>
+          <button
+            onClick={toggleFullscreen}
+            className="px-6 py-2.5 bg-stone-700 hover:bg-stone-600 active:bg-stone-800 text-stone-200 font-semibold rounded-lg transition-colors text-sm"
+          >
+            {isFullscreen ? 'Vollbild beenden' : 'Vollbild'}
           </button>
           <button
             onClick={handleNewGame}
