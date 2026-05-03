@@ -102,11 +102,11 @@ export interface ZoneMeta {
 }
 
 export const ZONES: Record<ZoneId, ZoneMeta> = {
-  grasslands:        { id: 'grasslands',        name: 'Grasslands',       tint: 0xffffff },
-  forest:            { id: 'forest',            name: 'Forest',           tint: 0x78a878 },
-  dungeon:           { id: 'dungeon',           name: 'Dungeon Entrance', tint: 0x8a8a8a },
-  dungeon_interior:  { id: 'dungeon_interior',  name: 'Dungeon Interior', tint: 0x606880 },
-  boss_room:         { id: 'boss_room',         name: 'Boss Chamber',     tint: 0x5a2850 },
+  grasslands:        { id: 'grasslands',        name: 'Grasland',         tint: 0xffffff },
+  forest:            { id: 'forest',            name: 'Wald',             tint: 0x78a878 },
+  dungeon:           { id: 'dungeon',           name: 'Verlies-Eingang',  tint: 0x8a8a8a },
+  dungeon_interior:  { id: 'dungeon_interior',  name: 'Verlies-Inneres',  tint: 0x606880 },
+  boss_room:         { id: 'boss_room',         name: 'Bosskammer',       tint: 0x5a2850 },
 };
 
 export const ZONE_ORDER: ZoneId[] = ['grasslands', 'forest', 'dungeon', 'dungeon_interior', 'boss_room'];

@@ -89,24 +89,24 @@ const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
     npcs: [
       {
         id: 'elara',
-        name: 'Elara the Herbalist',
+        name: 'Elara die Kräuterkundige',
         x: centerX - 110,
         y: centerY - 60,
         lines: [
-          'Welcome to the Grasslands, traveler. These fields have been my home for many seasons.',
-          'Beware the shadows stirring in the Forest to the east — creatures not seen for an age.',
-          'Take care, and may the old light guide your path.',
+          'Willkommen im Grasland, Wanderer. Diese Felder sind seit vielen Jahreszeiten meine Heimat.',
+          'Hüte dich vor den Schatten im Wald im Osten — Kreaturen, die seit Ewigkeiten nicht mehr gesehen wurden.',
+          'Pass auf dich auf, und möge das alte Licht deinen Weg führen.',
         ],
       },
       {
         id: 'magnus',
-        name: 'Old Magnus',
+        name: 'Alter Magnus',
         x: centerX + 110,
         y: centerY - 60,
         lines: [
-          'Hmph. Another young soul wandering into ruin.',
-          'Past the Forest lies the Dungeon Entrance — none who ventured within have returned whole.',
-          'If you must go, gather strength. Slay beasts. Crack open chests. Only then stand a chance.',
+          'Hm. Schon wieder eine junge Seele auf dem Weg ins Verderben.',
+          'Hinter dem Wald liegt der Verlies-Eingang — wer hineinging, kam nicht heil zurück.',
+          'Wenn du unbedingt willst: Werde stark. Besiege Bestien. Öffne Truhen. Nur so hast du eine Chance.',
         ],
       },
     ],
@@ -130,13 +130,13 @@ const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
     npcs: [
       {
         id: 'theron',
-        name: 'Theron the Wanderer',
+        name: 'Theron der Wanderer',
         x: centerX - 120,
         y: centerY + 80,
         lines: [
-          'These woods have grown dark of late... the shadows stir with something ancient.',
-          'I\'ve heard screams from beyond the dungeon gates. Turn back while you still can.',
-          'If you insist — find every sword upgrade you can. You will need the edge.',
+          'Dieser Wald ist in letzter Zeit düster geworden... die Schatten regen sich mit etwas Uraltem.',
+          'Ich habe Schreie jenseits der Verlies-Tore gehört. Kehr um, solange du noch kannst.',
+          'Wenn du darauf bestehst — finde jedes Schwertupgrade, das du kannst. Du wirst es brauchen.',
         ],
       },
     ],
@@ -163,13 +163,13 @@ const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
     npcs: [
       {
         id: 'arwen',
-        name: 'Arwen, Fallen Scout',
+        name: 'Arwen, Gefallene Späher',
         x: centerX + 80,
         y: centerY - 80,
         lines: [
-          '...heed my warning... I ventured within and barely escaped with my life.',
-          'Beyond this gate lies a labyrinth — and deeper within, something terrible awaits.',
-          'The Void Tyrant... ancient, relentless. Survive the interior first. Then face your fate.',
+          '...höre meine Warnung... Ich wagte mich hinein und entkam nur knapp mit dem Leben.',
+          'Hinter diesem Tor liegt ein Labyrinth — und tiefer darin wartet etwas Schreckliches.',
+          'Der Leere-Tyrann... uralt, unerbittlich. Überlebе zuerst das Innere. Dann stell dich deinem Schicksal.',
         ],
       },
     ],

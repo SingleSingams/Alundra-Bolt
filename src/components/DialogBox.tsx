@@ -58,7 +58,7 @@ export function DialogBox({ isOpen, npcName, lines, onClose }: DialogBoxProps) {
             </div>
             <div className="flex-1">
               <div className="text-[10px] uppercase tracking-[0.2em] text-amber-400/80 font-bold">
-                Speaking with
+                Gespräch mit
               </div>
               <div className="text-amber-100 font-semibold tracking-wide leading-tight">
                 {npcName}
@@ -92,8 +92,8 @@ export function DialogBox({ isOpen, npcName, lines, onClose }: DialogBoxProps) {
 
           <div className="flex items-center justify-between px-4 py-2 bg-stone-950/60 border-t border-stone-700/60">
             <div className="text-[11px] text-stone-400">
-              Page <span className="text-amber-300 font-semibold">{pageIndex + 1}</span>{' '}
-              of <span className="text-stone-300">{lines.length}</span>
+              Seite <span className="text-amber-300 font-semibold">{pageIndex + 1}</span>{' '}
+              von <span className="text-stone-300">{lines.length}</span>
             </div>
             <button
               onClick={advance}
@@ -102,7 +102,7 @@ export function DialogBox({ isOpen, npcName, lines, onClose }: DialogBoxProps) {
               <kbd className="px-1 py-0.5 text-[9px] font-mono bg-stone-800 rounded border border-stone-600 leading-none">
                 Z
               </kbd>
-              <span>{isLast ? 'Close' : 'Continue'}</span>
+              <span>{isLast ? 'Schließen' : 'Weiter'}</span>
               <ChevronRight className="w-3 h-3" />
             </button>
           </div>

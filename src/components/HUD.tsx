@@ -228,7 +228,7 @@ function InventorySlot({ item, index, onUsePotion }: InventorySlotProps) {
       )}
       {isPotion && (
         <span className="absolute -bottom-3.5 left-1/2 -translate-x-1/2 text-[8px] text-emerald-400 font-mono font-bold whitespace-nowrap">
-          E / Tap
+          E / Tippen
         </span>
       )}
     </div>
@@ -441,7 +441,7 @@ function BossHpBar({ hp, maxHp, phase }: BossHpBarProps) {
             'text-[10px] font-bold tracking-widest uppercase font-mono',
             isP2 ? 'text-purple-400' : 'text-red-400'
           )}>
-            Void Tyrant
+            Leere-Tyrann
           </span>
           <span className="text-[10px] font-mono text-stone-500">
             {hp}/{maxHp}
@@ -513,7 +513,7 @@ export function HUD({ hp, maxHp, isJumping, inventory, zone, xp, level, nextLeve
           <div className="flex items-center gap-1 mb-1">
             <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
             <span className="text-[10px] font-bold tracking-widest text-stone-400 uppercase">
-              Life
+              Leben
             </span>
           </div>
           <div className="flex gap-0.5">
@@ -570,7 +570,7 @@ export function HUD({ hp, maxHp, isJumping, inventory, zone, xp, level, nextLeve
         <div className="absolute top-4 left-1/2 -translate-x-1/2 pointer-events-none select-none">
           <div className="bg-sky-900/70 backdrop-blur-sm border border-sky-600/50 rounded-full px-4 py-1 shadow-lg animate-bounce">
             <span className="text-sky-300 text-xs font-bold tracking-wider uppercase">
-              Jump!
+              Sprung!
             </span>
           </div>
         </div>
@@ -580,12 +580,12 @@ export function HUD({ hp, maxHp, isJumping, inventory, zone, xp, level, nextLeve
         <div className="absolute bottom-4 right-4 pointer-events-none select-none">
           <div className="bg-stone-900/75 backdrop-blur-sm border border-stone-700/60 rounded-xl px-3 py-2.5 shadow-xl space-y-1.5">
             <div className="text-[10px] font-bold tracking-widest text-stone-400 uppercase mb-1.5">
-              Controls
+              Steuerung
             </div>
-            <ControlBadge keys={['W', 'A', 'S', 'D']} label="Move" />
-            <ControlBadge keys={['Z', 'Spc']} label="Jump / Open" />
-            <ControlBadge keys={['X']} label="Attack" />
-            <ControlBadge keys={['Y']} label="Ranged" />
+            <ControlBadge keys={['W', 'A', 'S', 'D']} label="Bewegen" />
+            <ControlBadge keys={['Z', 'Spc']} label="Springen / Öffnen" />
+            <ControlBadge keys={['X']} label="Angriff" />
+            <ControlBadge keys={['Y']} label="Fernkampf" />
           </div>
         </div>
       )}
