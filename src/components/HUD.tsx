@@ -395,10 +395,11 @@ interface HUDProps {
   nextLevelXp: number | null;
   minimapData: MinimapData | null;
   showHints: boolean;
+  shieldCharges: number;
   onUsePotion?: () => void;
 }
 
-export function HUD({ hp, maxHp, isJumping, inventory, zone, xp, level, nextLevelXp, minimapData, showHints, onUsePotion }: HUDProps) {
+export function HUD({ hp, maxHp, isJumping, inventory, zone, xp, level, nextLevelXp, minimapData, showHints, shieldCharges, onUsePotion }: HUDProps) {
   const fullHearts = Math.floor(hp / 2);
   const hasHalf = hp % 2 === 1;
   const totalSlots = Math.ceil(maxHp / 2);
@@ -449,6 +450,26 @@ export function HUD({ hp, maxHp, isJumping, inventory, zone, xp, level, nextLeve
             {hp}/{maxHp}
           </div>
           <XPBar xp={xp} level={level} nextLevelXp={nextLevelXp} />
+          {shieldCharges > 0 && (
+            <div className="mt-1.5 flex items-center gap-1">
+              <span className="text-[9px] font-bold tracking-widest text-stone-400 uppercase mr-0.5">
+                Schild
+              </span>
+              {Array.from({ length: shieldCharges }).map((_, i) => (
+                <svg key={i} width="14" height="14" viewBox="0 0 24 24" className="drop-shadow">
+                  <path
+                    d="M12 3 L20 6 L20 13 C20 17.5 16 21 12 22 C8 21 4 17.5 4 13 L4 6 Z"
+                    fill="#1d4ed8" stroke="#1e40af" strokeWidth="1"
+                  />
+                  <path
+                    d="M12 5 L18 7.5 L18 13 C18 16.5 15 19.5 12 20.5 C9 19.5 6 16.5 6 13 L6 7.5 Z"
+                    fill="#3b82f6"
+                  />
+                  <path d="M12 8 L12 17 M9 12.5 L15 12.5" stroke="#bfdbfe" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

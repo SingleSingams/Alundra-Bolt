@@ -268,6 +268,7 @@ export class MainScene extends Phaser.Scene {
       this.game.events.emit(GAME_EVENTS.XP_CHANGE, {
         xp: this.xp, level: this.level, nextLevelXp: XP_THRESHOLDS[this.level - 1] ?? null,
       });
+      this.game.events.emit(GAME_EVENTS.SHIELD_CHANGE, this.player.getShieldCharges());
       this.game.events.emit(GAME_EVENTS.SAVE_LOADED);
     } else {
       this.inventory = [];
@@ -275,6 +276,7 @@ export class MainScene extends Phaser.Scene {
       this.game.events.emit(GAME_EVENTS.XP_CHANGE, {
         xp: 0, level: 1, nextLevelXp: XP_THRESHOLDS[0],
       });
+      this.game.events.emit(GAME_EVENTS.SHIELD_CHANGE, 0);
     }
 
     this.useItemKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E);

@@ -34,6 +34,7 @@ export function GameCanvas() {
   const [nextLevelXp, setNextLevelXp] = useState<number | null>(XP_THRESHOLDS[0]);
   const [levelUpNotice, setLevelUpNotice] = useState<number | null>(null);
   const [minimapData, setMinimapData] = useState<MinimapData | null>(null);
+  const [shieldCharges, setShieldCharges] = useState(0);
   const [paused, setPaused] = useState(false);
   const [settings, setSettings] = useState<Settings>(() => SettingsSystem.load());
   const [loadProgress, setLoadProgress] = useState(0);
@@ -84,6 +85,8 @@ export function GameCanvas() {
   const handleLoadProgress = useCallback((v: number) => setLoadProgress(v), []);
   const handleLoadComplete = useCallback(() => setLoaded(true), []);
 
+  const handleShieldChange = useCallback((charges: number) => setShieldCharges(charges), []);
+
   const handleUsePotion = useCallback(() => {
     gameRef.current?.events.emit(GAME_EVENTS.USE_POTION);
   }, []);
@@ -113,6 +116,7 @@ export function GameCanvas() {
     game.events.on(GAME_EVENTS.MINIMAP_UPDATE, handleMinimapUpdate);
     game.events.on(GAME_EVENTS.LOADING_PROGRESS, handleLoadProgress);
     game.events.on(GAME_EVENTS.LOADING_COMPLETE, handleLoadComplete);
+    game.events.on(GAME_EVENTS.SHIELD_CHANGE, handleShieldChange);
 
     return () => {
       game.events.off(GAME_EVENTS.HP_CHANGE, handleHpChange);
@@ -128,6 +132,7 @@ export function GameCanvas() {
       game.events.off(GAME_EVENTS.MINIMAP_UPDATE, handleMinimapUpdate);
       game.events.off(GAME_EVENTS.LOADING_PROGRESS, handleLoadProgress);
       game.events.off(GAME_EVENTS.LOADING_COMPLETE, handleLoadComplete);
+      game.events.off(GAME_EVENTS.SHIELD_CHANGE, handleShieldChange);
       game.destroy(true);
       gameRef.current = null;
     };
@@ -145,6 +150,7 @@ export function GameCanvas() {
     handleMinimapUpdate,
     handleLoadProgress,
     handleLoadComplete,
+    handleShieldChange,
   ]);
 
   // ESC key → pause toggle (skip during game over)
@@ -191,6 +197,7 @@ export function GameCanvas() {
         nextLevelXp={nextLevelXp}
         minimapData={minimapData}
         showHints={settings.showHints}
+        shieldCharges={shieldCharges}
         onUsePotion={handleUsePotion}
       />
       {settings.showTouchControls && <TouchControls />}

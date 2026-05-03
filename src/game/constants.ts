@@ -60,6 +60,7 @@ export const GAME_EVENTS = {
   LOADING_PROGRESS: 'loading-progress',
   LOADING_COMPLETE: 'loading-complete',
   USE_POTION: 'use-potion',
+  SHIELD_CHANGE: 'shield-change',
 } as const;
 
 export interface MinimapDot {

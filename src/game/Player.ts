@@ -409,6 +409,7 @@ export class Player extends Phaser.GameObjects.Container {
     if (this.shieldCharges > 0) {
       this.shieldCharges--;
       this.scene.game.events.emit(GAME_EVENTS.SHIELD_BLOCK, { x: this.x, y: this.y });
+      this.scene.game.events.emit(GAME_EVENTS.SHIELD_CHANGE, this.shieldCharges);
       this.invincibleTimer = 700;
       return;
     }
@@ -425,6 +426,11 @@ export class Player extends Phaser.GameObjects.Container {
 
   addShield(): void {
     this.shieldCharges++;
+    this.scene.game.events.emit(GAME_EVENTS.SHIELD_CHANGE, this.shieldCharges);
+  }
+
+  getShieldCharges(): number {
+    return this.shieldCharges;
   }
 
   wantsShoot(): boolean {
