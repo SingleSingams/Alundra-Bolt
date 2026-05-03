@@ -1,0 +1,64 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { SaveSystem } from '../SaveSystem';
+
+const FULL_SAVE = {
+  hp: 4,
+  zone: 'forest' as const,
+  inventory: ['heart', 'potion'] as const,
+  xp: 25,
+  level: 3,
+  savedAt: 1000,
+};
+
+describe('SaveSystem', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('returns null when no save exists', () => {
+    expect(SaveSystem.load()).toBeNull();
+  });
+
+  it('exists() returns false when no save', () => {
+    expect(SaveSystem.exists()).toBe(false);
+  });
+
+  it('saves and loads all fields correctly', () => {
+    SaveSystem.save(FULL_SAVE);
+    const loaded = SaveSystem.load();
+    expect(loaded).not.toBeNull();
+    expect(loaded?.hp).toBe(4);
+    expect(loaded?.zone).toBe('forest');
+    expect(loaded?.inventory).toEqual(['heart', 'potion']);
+    expect(loaded?.xp).toBe(25);
+    expect(loaded?.level).toBe(3);
+    expect(loaded?.savedAt).toBe(1000);
+  });
+
+  it('exists() returns true after save', () => {
+    SaveSystem.save(FULL_SAVE);
+    expect(SaveSystem.exists()).toBe(true);
+  });
+
+  it('clear() removes the save', () => {
+    SaveSystem.save(FULL_SAVE);
+    SaveSystem.clear();
+    expect(SaveSystem.load()).toBeNull();
+    expect(SaveSystem.exists()).toBe(false);
+  });
+
+  it('uses defaults for missing fields on partial data', () => {
+    localStorage.setItem('verdant-chronicles-save', JSON.stringify({ hp: 3 }));
+    const loaded = SaveSystem.load();
+    expect(loaded?.hp).toBe(3);
+    expect(loaded?.zone).toBe('grasslands');
+    expect(loaded?.inventory).toEqual([]);
+    expect(loaded?.xp).toBe(0);
+    expect(loaded?.level).toBe(1);
+  });
+
+  it('returns null on corrupt JSON', () => {
+    localStorage.setItem('verdant-chronicles-save', 'not-valid-json{{');
+    expect(SaveSystem.load()).toBeNull();
+  });
+});
