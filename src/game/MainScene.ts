@@ -1,6 +1,6 @@
 import * as Phaser from 'phaser';
 import { Player } from './Player';
-import { Enemy, PatrolAxis } from './Enemy';
+import { Enemy, PatrolAxis, EnemyType } from './Enemy';
 import { Item, WorldItemType } from './Item';
 import { NPC, NPCDefinition } from './NPC';
 import {
@@ -57,7 +57,7 @@ type EdgeDirection = 'east' | 'west';
 interface ZoneConfig {
   numTrees: number;
   obstacleDensity: number;
-  enemySpawns: Array<{ tx: number; ty: number; axis: PatrolAxis }>;
+  enemySpawns: Array<{ tx: number; ty: number; axis: PatrolAxis; type?: EnemyType }>;
   heartSpawns: Array<{ tx: number; ty: number }>;
   npcs: NPCDefinition[];
   transitions: Partial<Record<EdgeDirection, ZoneId>>;
@@ -115,8 +115,8 @@ const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
       { tx: 44, ty: 22, axis: 'y' },
       { tx: 22, ty: 44, axis: 'x' },
       { tx: 42, ty: 42, axis: 'y' },
-      { tx: 30, ty: 14, axis: 'x' },
-      { tx: 18, ty: 32, axis: 'y' },
+      { tx: 30, ty: 14, axis: 'x', type: 'ranger' },
+      { tx: 18, ty: 32, axis: 'y', type: 'ranger' },
     ],
     heartSpawns: [
       { tx: 30, ty: 30 },
@@ -143,10 +143,10 @@ const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
     enemySpawns: [
       { tx: 18, ty: 20, axis: 'x' },
       { tx: 42, ty: 20, axis: 'y' },
-      { tx: 18, ty: 40, axis: 'y' },
-      { tx: 42, ty: 40, axis: 'x' },
+      { tx: 18, ty: 40, axis: 'y', type: 'shielder' },
+      { tx: 42, ty: 40, axis: 'x', type: 'shielder' },
       { tx: 30, ty: 30, axis: 'x' },
-      { tx: 30, ty: 16, axis: 'y' },
+      { tx: 30, ty: 16, axis: 'y', type: 'ranger' },
       { tx: 14, ty: 30, axis: 'x' },
     ],
     heartSpawns: [{ tx: 30, ty: 46 }],
@@ -169,14 +169,14 @@ const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
     numTrees: 0,
     obstacleDensity: 0.28,
     enemySpawns: [
-      { tx: 12, ty: 12, axis: 'x' },
-      { tx: 48, ty: 12, axis: 'y' },
+      { tx: 12, ty: 12, axis: 'x', type: 'speedrunner' },
+      { tx: 48, ty: 12, axis: 'y', type: 'speedrunner' },
       { tx: 12, ty: 48, axis: 'y' },
       { tx: 48, ty: 48, axis: 'x' },
-      { tx: 30, ty: 18, axis: 'x' },
-      { tx: 18, ty: 30, axis: 'y' },
-      { tx: 42, ty: 30, axis: 'x' },
-      { tx: 30, ty: 42, axis: 'y' },
+      { tx: 30, ty: 18, axis: 'x', type: 'shielder' },
+      { tx: 18, ty: 30, axis: 'y', type: 'ranger' },
+      { tx: 42, ty: 30, axis: 'x', type: 'ranger' },
+      { tx: 30, ty: 42, axis: 'y', type: 'speedrunner' },
     ],
     heartSpawns: [{ tx: 30, ty: 30 }],
     npcs: [],
@@ -186,10 +186,10 @@ const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
     numTrees: 0,
     obstacleDensity: 0.08,
     enemySpawns: [
-      { tx: 14, ty: 14, axis: 'x' },
-      { tx: 46, ty: 14, axis: 'y' },
-      { tx: 14, ty: 46, axis: 'y' },
-      { tx: 46, ty: 46, axis: 'x' },
+      { tx: 14, ty: 14, axis: 'x', type: 'speedrunner' },
+      { tx: 46, ty: 14, axis: 'y', type: 'speedrunner' },
+      { tx: 14, ty: 46, axis: 'y', type: 'shielder' },
+      { tx: 46, ty: 46, axis: 'x', type: 'shielder' },
     ],
     heartSpawns: [],
     npcs: [],
@@ -561,7 +561,7 @@ export class MainScene extends Phaser.Scene {
     for (const spawn of spawns) {
       const px = spawn.tx * TILE_SIZE + TILE_SIZE / 2;
       const py = spawn.ty * TILE_SIZE + TILE_SIZE / 2;
-      const enemy = new Enemy(this, px, py, spawn.axis, this.level);
+      const enemy = new Enemy(this, px, py, spawn.axis, this.level, spawn.type ?? 'basic');
       this.enemies.push(enemy);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       this.physics.add.collider(enemy as any, this.obstacles);
@@ -1142,7 +1142,15 @@ export class MainScene extends Phaser.Scene {
     this.player.setDepth(this.player.y + 1);
 
     for (const enemy of this.enemies) {
-      if (enemy.active) enemy.update(this.player, delta);
+      if (!enemy.active) continue;
+      enemy.update(this.player, delta);
+      if (enemy.wantsShoot(this.player)) {
+        const angle = enemy.getShootAngle(this.player.x, this.player.y);
+        const proj = new Projectile(this, enemy.x, enemy.y, angle, true);
+        this.projectiles.push(proj);
+        enemy.markShot();
+        SoundSystem.playProjectile();
+      }
     }
 
     for (const item of this.items) {

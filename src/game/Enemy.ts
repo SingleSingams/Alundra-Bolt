@@ -7,9 +7,12 @@ const LEASH_RANGE = 250;
 const ENEMY_SPEED = 75;
 const PATROL_SPEED = 42;
 const PATROL_RANGE = TILE_SIZE * 3;
+const RANGER_STOP_RANGE = 120;
+const RANGER_SHOOT_INTERVAL = 2000;
 
 type EnemyState = 'PATROL' | 'CHASE';
 export type PatrolAxis = 'x' | 'y';
+export type EnemyType = 'basic' | 'ranger' | 'shielder' | 'speedrunner';
 
 export class Enemy extends Phaser.GameObjects.Container {
   private sprite: Phaser.GameObjects.Image;
@@ -19,6 +22,7 @@ export class Enemy extends Phaser.GameObjects.Container {
   private aiState: EnemyState = 'PATROL';
   private readonly patrolCenter: Phaser.Math.Vector2;
   private readonly patrolAxis: PatrolAxis;
+  readonly enemyType: EnemyType;
   private patrolDir = 1;
   private alertVisible = false;
   private hp: number;
@@ -26,24 +30,41 @@ export class Enemy extends Phaser.GameObjects.Container {
   private contactDamage: number;
   private hitInvulnTimer = 0;
   private dying = false;
+  private shieldActive = false;
+  private shieldGfx!: Phaser.GameObjects.Graphics;
+  private shootCooldown = 0;
+  private chaseSpeed: number;
 
-  constructor(scene: Phaser.Scene, x: number, y: number, patrolAxis: PatrolAxis = 'x', level = 1) {
+  constructor(scene: Phaser.Scene, x: number, y: number, patrolAxis: PatrolAxis = 'x', level = 1, type: EnemyType = 'basic') {
     super(scene, x, y);
 
     this.patrolCenter = new Phaser.Math.Vector2(x, y);
     this.patrolAxis = patrolAxis;
+    this.enemyType = type;
     const idx = Math.min(level - 1, ENEMY_HP_SCALE.length - 1);
     this.maxHp = Math.round(ENEMY_MAX_HP * ENEMY_HP_SCALE[idx]);
     this.hp = this.maxHp;
     this.contactDamage = ENEMY_DAMAGE_SCALE[idx];
+    this.chaseSpeed = type === 'speedrunner' ? ENEMY_SPEED * 2.1 : ENEMY_SPEED;
 
     this.ensureTextures(scene);
 
-    this.shadow = scene.add.image(0, 9, 'shadow').setAlpha(0.38).setScale(0.8);
-    this.sprite = scene.add.image(0, 0, 'enemy');
-    this.alertBubble = scene.add.graphics();
+    const textureKey = type === 'ranger' ? 'enemy-ranger'
+      : type === 'shielder' ? 'enemy-shielder'
+      : type === 'speedrunner' ? 'enemy-speedrunner'
+      : 'enemy';
 
-    this.add([this.shadow, this.sprite, this.alertBubble]);
+    this.shadow = scene.add.image(0, 9, 'shadow').setAlpha(0.38).setScale(0.8);
+    this.sprite = scene.add.image(0, 0, textureKey);
+    this.alertBubble = scene.add.graphics();
+    this.shieldGfx = scene.add.graphics();
+
+    if (type === 'shielder') {
+      this.shieldActive = true;
+      this.drawShield();
+    }
+
+    this.add([this.shadow, this.sprite, this.shieldGfx, this.alertBubble]);
 
     scene.add.existing(this);
     scene.physics.add.existing(this);
@@ -55,42 +76,73 @@ export class Enemy extends Phaser.GameObjects.Container {
   }
 
   private ensureTextures(scene: Phaser.Scene): void {
-    if (scene.textures.exists('enemy')) return;
+    if (!scene.textures.exists('enemy')) {
+      const g = scene.add.graphics();
+      const s = 24;
+      g.fillStyle(0xb91c1c, 1); g.fillRect(2, 5, s - 4, s - 7);
+      g.fillStyle(0xef4444, 1); g.fillRect(3, 6, s - 6, 4);
+      g.fillStyle(0xffffff, 1); g.fillCircle(7, 11, 3.5); g.fillCircle(s - 7, 11, 3.5);
+      g.fillStyle(0x111111, 1); g.fillCircle(7, 12, 1.8); g.fillCircle(s - 7, 12, 1.8);
+      g.fillStyle(0x7f1d1d, 1); g.fillRect(3, 6, 7, 2); g.fillRect(s - 10, 6, 7, 2);
+      g.generateTexture('enemy', s, s); g.destroy();
+    }
 
-    const gfx = scene.add.graphics();
-    const s = 24;
+    if (!scene.textures.exists('enemy-ranger')) {
+      const g = scene.add.graphics();
+      const s = 22;
+      g.fillStyle(0x1d4ed8, 1); g.fillRect(2, 5, s - 4, s - 7);
+      g.fillStyle(0x3b82f6, 1); g.fillRect(3, 6, s - 6, 4);
+      g.fillStyle(0xffffff, 1); g.fillCircle(6, 11, 3); g.fillCircle(s - 6, 11, 3);
+      g.fillStyle(0x111111, 1); g.fillCircle(6, 12, 1.5); g.fillCircle(s - 6, 12, 1.5);
+      g.fillStyle(0x1e3a8a, 1); g.fillRect(3, 6, 6, 2); g.fillRect(s - 9, 6, 6, 2);
+      // Bow hint
+      g.lineStyle(2, 0x93c5fd, 1);
+      g.beginPath(); g.arc(s / 2, 18, 4, Math.PI * 1.1, Math.PI * 1.9); g.strokePath();
+      g.generateTexture('enemy-ranger', s, s); g.destroy();
+    }
 
-    // Body
-    gfx.fillStyle(0xb91c1c, 1);
-    gfx.fillRect(2, 5, s - 4, s - 7);
+    if (!scene.textures.exists('enemy-shielder')) {
+      const g = scene.add.graphics();
+      const s = 26;
+      g.fillStyle(0x57534e, 1); g.fillRect(2, 5, s - 4, s - 7);
+      g.fillStyle(0x78716c, 1); g.fillRect(3, 6, s - 6, 4);
+      g.fillStyle(0xffffff, 1); g.fillCircle(8, 12, 3.5); g.fillCircle(s - 8, 12, 3.5);
+      g.fillStyle(0x111111, 1); g.fillCircle(8, 13, 1.8); g.fillCircle(s - 8, 13, 1.8);
+      g.fillStyle(0x44403c, 1); g.fillRect(3, 6, 8, 2); g.fillRect(s - 11, 6, 8, 2);
+      g.generateTexture('enemy-shielder', s, s); g.destroy();
+    }
 
-    // Highlight
-    gfx.fillStyle(0xef4444, 1);
-    gfx.fillRect(3, 6, s - 6, 4);
+    if (!scene.textures.exists('enemy-speedrunner')) {
+      const g = scene.add.graphics();
+      const s = 20;
+      g.fillStyle(0xd97706, 1); g.fillRect(2, 4, s - 4, s - 6);
+      g.fillStyle(0xfbbf24, 1); g.fillRect(3, 5, s - 6, 3);
+      g.fillStyle(0xffffff, 1); g.fillCircle(6, 10, 3); g.fillCircle(s - 6, 10, 3);
+      g.fillStyle(0x111111, 1); g.fillCircle(6, 11, 1.5); g.fillCircle(s - 6, 11, 1.5);
+      g.fillStyle(0x92400e, 1); g.fillRect(2, 5, 6, 2); g.fillRect(s - 8, 5, 6, 2);
+      // Speed lines
+      g.lineStyle(1.5, 0xfef3c7, 0.8);
+      g.lineBetween(0, 8, 3, 8); g.lineBetween(0, 12, 4, 12);
+      g.generateTexture('enemy-speedrunner', s, s); g.destroy();
+    }
+  }
 
-    // Eyes (white sclera)
-    gfx.fillStyle(0xffffff, 1);
-    gfx.fillCircle(7, 11, 3.5);
-    gfx.fillCircle(s - 7, 11, 3.5);
-
-    // Pupils
-    gfx.fillStyle(0x111111, 1);
-    gfx.fillCircle(7, 12, 1.8);
-    gfx.fillCircle(s - 7, 12, 1.8);
-
-    // Angry brows
-    gfx.fillStyle(0x7f1d1d, 1);
-    gfx.fillRect(3, 6, 7, 2);
-    gfx.fillRect(s - 10, 6, 7, 2);
-
-    gfx.generateTexture('enemy', s, s);
-    gfx.destroy();
+  private drawShield(): void {
+    this.shieldGfx.clear();
+    if (!this.shieldActive) return;
+    this.shieldGfx.lineStyle(2.5, 0x93c5fd, 0.85);
+    this.shieldGfx.strokeCircle(0, 0, 16);
+    this.shieldGfx.fillStyle(0x3b82f6, 0.18);
+    this.shieldGfx.fillCircle(0, 0, 16);
   }
 
   update(player: Player, delta: number = 16): void {
     if (this.dying) return;
     if (this.hitInvulnTimer > 0) {
       this.hitInvulnTimer = Math.max(0, this.hitInvulnTimer - delta);
+    }
+    if (this.shootCooldown > 0) {
+      this.shootCooldown = Math.max(0, this.shootCooldown - delta);
     }
 
     const dist = Phaser.Math.Distance.Between(this.x, this.y, player.x, player.y);
@@ -108,6 +160,8 @@ export class Enemy extends Phaser.GameObjects.Container {
       case 'CHASE':
         if (dist > LEASH_RANGE) {
           this.enterPatrol(body);
+        } else if (this.enemyType === 'ranger' && dist < RANGER_STOP_RANGE) {
+          body.setVelocity(0, 0);
         } else {
           this.doChase(player, body);
         }
@@ -115,6 +169,21 @@ export class Enemy extends Phaser.GameObjects.Container {
     }
 
     this.setDepth(this.y + 1);
+  }
+
+  wantsShoot(player: Player): boolean {
+    if (this.enemyType !== 'ranger' || this.dying || this.aiState !== 'CHASE') return false;
+    if (this.shootCooldown > 0) return false;
+    const dist = Phaser.Math.Distance.Between(this.x, this.y, player.x, player.y);
+    return dist < RANGER_STOP_RANGE + 30;
+  }
+
+  markShot(): void {
+    this.shootCooldown = RANGER_SHOOT_INTERVAL;
+  }
+
+  getShootAngle(playerX: number, playerY: number): number {
+    return Math.atan2(playerY - this.y, playerX - this.x) * (180 / Math.PI);
   }
 
   private enterChase(): void {
@@ -153,7 +222,7 @@ export class Enemy extends Phaser.GameObjects.Container {
     const dy = player.y - this.y;
     const len = Math.sqrt(dx * dx + dy * dy);
     if (len > 1) {
-      body.setVelocity((dx / len) * ENEMY_SPEED, (dy / len) * ENEMY_SPEED);
+      body.setVelocity((dx / len) * this.chaseSpeed, (dy / len) * this.chaseSpeed);
     }
   }
 
@@ -195,6 +264,12 @@ export class Enemy extends Phaser.GameObjects.Container {
 
   takeDamage(amount: number, onDeath: (x: number, y: number) => void): boolean {
     if (!this.canBeHit()) return false;
+    if (this.shieldActive) {
+      this.shieldActive = false;
+      this.shieldGfx.clear();
+      this.hitInvulnTimer = ENEMY_HIT_INVULN_MS;
+      return false;
+    }
     this.hp = Math.max(0, this.hp - amount);
     this.hitInvulnTimer = ENEMY_HIT_INVULN_MS;
 
