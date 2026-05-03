@@ -178,10 +178,11 @@ export class Item extends Phaser.GameObjects.Container {
     });
 
     const r = Math.random();
-    if (r < 0.30) return 'heart';
-    if (r < 0.55) return 'potion';
-    if (r < 0.78) return 'shield_fragment';
-    return 'sword_upgrade';
+    if (r < 0.28) return 'heart';
+    if (r < 0.50) return 'potion';
+    if (r < 0.70) return 'shield_fragment';
+    if (r < 0.85) return 'sword_upgrade';
+    return 'projectile_upgrade';
   }
 
   /** Marks a pickup as collected and removes it with a small tween. */

@@ -242,6 +242,7 @@ export class MainScene extends Phaser.Scene {
   private isFreezeFraming = false;
   private ambientBreathTime = 0;
   private currentAttackDamage = ATTACK_DAMAGE;
+  private currentProjectileDamage = PROJECTILE_DAMAGE;
   private boss: Boss | null = null;
   private projectiles: Projectile[] = [];
   private xp = 0;
@@ -732,11 +733,11 @@ export class MainScene extends Phaser.Scene {
         const proj = projObj as Projectile;
         if (proj.isSpent() || proj.isEnemyProjectile || !this.boss?.canBeHit()) return;
         proj.hit();
-        const died = this.boss.takeDamage(PROJECTILE_DAMAGE, (bx, by) => this.onBossDeath(bx, by));
+        const died = this.boss.takeDamage(this.currentProjectileDamage, (bx, by) => this.onBossDeath(bx, by));
         if (!died) {
           SoundSystem.playEnemyHit();
           this.spawnParticleBurst(this.boss.x, this.boss.y, 0xfbbf24, 5, 40, 280);
-          this.showDamageNumber(this.boss.x, this.boss.y - 22, PROJECTILE_DAMAGE, false);
+          this.showDamageNumber(this.boss.x, this.boss.y - 22, this.currentProjectileDamage, false);
         }
       }
     );
@@ -882,9 +883,9 @@ export class MainScene extends Phaser.Scene {
         if (proj.isSpent() || proj.isEnemyProjectile || !enemy.canBeHit()) return;
         proj.hit();
         const eid2 = enemy.name;
-        enemy.takeDamage(PROJECTILE_DAMAGE, (ex, ey) => this.onEnemyDeath(ex, ey, eid2));
+        enemy.takeDamage(this.currentProjectileDamage, (ex, ey) => this.onEnemyDeath(ex, ey, eid2));
         this.spawnParticleBurst(enemy.x, enemy.y, 0xfbbf24, 5, 40, 280);
-        this.showDamageNumber(enemy.x, enemy.y - 10, PROJECTILE_DAMAGE, false);
+        this.showDamageNumber(enemy.x, enemy.y - 10, this.currentProjectileDamage, false);
       },
       undefined,
       this
@@ -1241,8 +1242,8 @@ export class MainScene extends Phaser.Scene {
 
   private applyChestReward(reward: InventoryItem): void {
     if (reward === 'heart') this.player.heal(HEART_HEAL_AMOUNT);
-    // Potions from chests are stored; player uses them manually via E / tap
     if (reward === 'shield_fragment') this.player.addShield();
+    if (reward === 'projectile_upgrade') this.currentProjectileDamage++;
     this.addToInventory(reward);
   }
 

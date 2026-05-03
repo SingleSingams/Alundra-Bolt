@@ -160,6 +160,19 @@ function PotionIcon() {
   );
 }
 
+function ProjectileUpgradeIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" className="drop-shadow">
+      <circle cx="12" cy="12" r="7" fill="#fbbf24" opacity="0.4" />
+      <circle cx="12" cy="12" r="4" fill="#fef3c7" />
+      <circle cx="12" cy="12" r="2.5" fill="#fde68a" />
+      <line x1="5" y1="5" x2="9" y2="9" stroke="#fbbf24" strokeWidth="1.5" />
+      <line x1="19" y1="5" x2="15" y2="9" stroke="#fbbf24" strokeWidth="1.5" />
+      <line x1="12" y1="3" x2="12" y2="7" stroke="#fbbf24" strokeWidth="1.5" />
+    </svg>
+  );
+}
+
 function ShieldIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" className="drop-shadow">
@@ -207,6 +220,7 @@ function InventorySlot({ item, index, onUsePotion }: InventorySlotProps) {
           {item === 'heart' ? <HeartIcon /> :
            item === 'potion' ? <PotionIcon /> :
            item === 'shield_fragment' ? <ShieldIcon /> :
+           item === 'projectile_upgrade' ? <ProjectileUpgradeIcon /> :
            <SwordIcon />}
         </div>
       ) : (

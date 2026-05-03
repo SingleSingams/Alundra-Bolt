@@ -91,7 +91,7 @@ export interface MinimapData {
   exploredChunks: string[];
 }
 
-export type InventoryItem = 'heart' | 'sword_upgrade' | 'potion' | 'shield_fragment';
+export type InventoryItem = 'heart' | 'sword_upgrade' | 'potion' | 'shield_fragment' | 'projectile_upgrade';
 
 export type ZoneId = 'grasslands' | 'forest' | 'dungeon' | 'dungeon_interior' | 'boss_room';
 
