@@ -1,4 +1,5 @@
 import * as Phaser from 'phaser';
+import { LoadingScene } from './LoadingScene';
 import { MainScene } from './MainScene';
 import { WORLD_WIDTH, WORLD_HEIGHT } from './constants';
 
@@ -16,7 +17,7 @@ export function createGameConfig(parent: HTMLElement): Phaser.Types.Core.GameCon
         debug: false,
       },
     },
-    scene: [MainScene],
+    scene: [LoadingScene, MainScene],
     scale: {
       mode: Phaser.Scale.RESIZE,
       autoCenter: Phaser.Scale.CENTER_BOTH,

@@ -56,6 +56,8 @@ export const GAME_EVENTS = {
   XP_CHANGE: 'xp-change',
   LEVEL_UP: 'level-up',
   MINIMAP_UPDATE: 'minimap-update',
+  LOADING_PROGRESS: 'loading-progress',
+  LOADING_COMPLETE: 'loading-complete',
 } as const;
 
 export interface MinimapDot {

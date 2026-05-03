@@ -17,6 +17,7 @@ import { DialogBox } from './DialogBox';
 import { GameOverScreen } from './GameOverScreen';
 import { PauseMenu } from './PauseMenu';
 import { TouchControls } from './TouchControls';
+import { LoadingScreen } from './LoadingScreen';
 
 export function GameCanvas() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -35,6 +36,8 @@ export function GameCanvas() {
   const [minimapData, setMinimapData] = useState<MinimapData | null>(null);
   const [paused, setPaused] = useState(false);
   const [settings, setSettings] = useState<Settings>(() => SettingsSystem.load());
+  const [loadProgress, setLoadProgress] = useState(0);
+  const [loaded, setLoaded] = useState(false);
 
   const handleSettingsChange = useCallback((s: Settings) => {
     setSettings(s);
@@ -78,6 +81,8 @@ export function GameCanvas() {
     setTimeout(() => setLevelUpNotice(null), 2200);
   }, []);
   const handleMinimapUpdate = useCallback((data: MinimapData) => setMinimapData(data), []);
+  const handleLoadProgress = useCallback((v: number) => setLoadProgress(v), []);
+  const handleLoadComplete = useCallback(() => setLoaded(true), []);
 
   const closeDialog = useCallback(() => {
     setDialog(null);
@@ -102,6 +107,8 @@ export function GameCanvas() {
     game.events.on(GAME_EVENTS.XP_CHANGE, handleXpChange);
     game.events.on(GAME_EVENTS.LEVEL_UP, handleLevelUp);
     game.events.on(GAME_EVENTS.MINIMAP_UPDATE, handleMinimapUpdate);
+    game.events.on(GAME_EVENTS.LOADING_PROGRESS, handleLoadProgress);
+    game.events.on(GAME_EVENTS.LOADING_COMPLETE, handleLoadComplete);
 
     return () => {
       game.events.off(GAME_EVENTS.HP_CHANGE, handleHpChange);
@@ -115,6 +122,8 @@ export function GameCanvas() {
       game.events.off(GAME_EVENTS.XP_CHANGE, handleXpChange);
       game.events.off(GAME_EVENTS.LEVEL_UP, handleLevelUp);
       game.events.off(GAME_EVENTS.MINIMAP_UPDATE, handleMinimapUpdate);
+      game.events.off(GAME_EVENTS.LOADING_PROGRESS, handleLoadProgress);
+      game.events.off(GAME_EVENTS.LOADING_COMPLETE, handleLoadComplete);
       game.destroy(true);
       gameRef.current = null;
     };
@@ -130,6 +139,8 @@ export function GameCanvas() {
     handleXpChange,
     handleLevelUp,
     handleMinimapUpdate,
+    handleLoadProgress,
+    handleLoadComplete,
   ]);
 
   // ESC key → pause toggle (skip during game over)
@@ -201,7 +212,8 @@ export function GameCanvas() {
         lines={dialog?.lines ?? []}
         onClose={closeDialog}
       />
-      <GameOverScreen isOpen={gameOver} />
+      <GameOverScreen isOpen={gameOver} level={level} xp={xp} zone={zone} />
+      {!loaded && <LoadingScreen progress={loadProgress} />}
       <PauseMenu
         isOpen={paused && !gameOver}
         onResume={() => setPaused(false)}

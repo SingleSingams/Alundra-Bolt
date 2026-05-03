@@ -1,10 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SaveSystem } from '../SaveSystem';
 
+import type { InventoryItem } from '../constants';
+
 const FULL_SAVE = {
   hp: 4,
   zone: 'forest' as const,
-  inventory: ['heart', 'potion'] as const,
+  inventory: ['heart', 'potion'] as InventoryItem[],
   xp: 25,
   level: 3,
   savedAt: 1000,
