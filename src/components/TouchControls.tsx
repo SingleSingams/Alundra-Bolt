@@ -34,7 +34,10 @@ function ActionBtn({
 
 export function TouchControls() {
   return (
-    <div className="absolute bottom-4 left-0 right-0 pointer-events-none select-none z-40 flex justify-between px-4">
+    <div
+      className="absolute bottom-0 left-0 right-0 pointer-events-none select-none z-40 flex justify-between px-4"
+      style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
+    >
       {/* D-pad */}
       <div className="pointer-events-auto grid grid-cols-3 gap-1" style={{ width: 176, height: 176 }}>
         <div />

@@ -376,19 +376,16 @@ function Minimap({ zone, minimapData }: MinimapProps) {
   const zoneMeta = ZONES[zone];
 
   return (
-    <div className="absolute bottom-4 left-4 pointer-events-none select-none">
-      <div className="bg-stone-900/75 backdrop-blur-sm border border-stone-700/60 rounded-xl px-3 py-2.5 shadow-xl">
-        <div className="flex items-center gap-1.5 mb-1.5">
+    <div className="pointer-events-none select-none mt-2">
+      <div className="bg-stone-900/75 backdrop-blur-sm border border-stone-700/60 rounded-xl px-2.5 py-2 shadow-xl">
+        <div className="flex items-center gap-1.5 mb-1">
           <MapPin className="w-3 h-3 text-emerald-400" />
-          <span className="text-[10px] font-bold tracking-widest text-stone-400 uppercase">
-            Region
-          </span>
-        </div>
-        <div
-          key={zone}
-          className="text-amber-100 font-semibold text-sm leading-tight animate-in fade-in slide-in-from-left-1 duration-300"
-        >
-          {zoneMeta.name}
+          <div
+            key={zone}
+            className="text-amber-100 font-semibold text-xs leading-tight truncate max-w-[90px]"
+          >
+            {zoneMeta.name}
+          </div>
         </div>
         <MinimapCanvas data={minimapData} />
       </div>
@@ -479,12 +476,13 @@ interface HUDProps {
   nextLevelXp: number | null;
   minimapData: MinimapData | null;
   showHints: boolean;
+  showTouchControls?: boolean;
   shieldCharges: number;
   bossHp: { hp: number; maxHp: number; phase: number } | null;
   onUsePotion?: () => void;
 }
 
-export function HUD({ hp, maxHp, isJumping, inventory, zone, xp, level, nextLevelXp, minimapData, showHints, shieldCharges, bossHp, onUsePotion }: HUDProps) {
+export function HUD({ hp, maxHp, isJumping, inventory, zone, xp, level, nextLevelXp, minimapData, showHints, showTouchControls, shieldCharges, bossHp, onUsePotion }: HUDProps) {
   const fullHearts = Math.floor(hp / 2);
   const hasHalf = hp % 2 === 1;
   const totalSlots = Math.ceil(maxHp / 2);
@@ -555,6 +553,7 @@ export function HUD({ hp, maxHp, isJumping, inventory, zone, xp, level, nextLeve
               ))}
             </div>
           )}
+          <Minimap zone={zone} minimapData={minimapData} />
         </div>
       </div>
 
@@ -563,8 +562,6 @@ export function HUD({ hp, maxHp, isJumping, inventory, zone, xp, level, nextLeve
       {bossHp && bossHp.hp > 0 && (
         <BossHpBar hp={bossHp.hp} maxHp={bossHp.maxHp} phase={bossHp.phase} />
       )}
-
-      <Minimap zone={zone} minimapData={minimapData} />
 
       {isJumping && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 pointer-events-none select-none">
@@ -576,7 +573,7 @@ export function HUD({ hp, maxHp, isJumping, inventory, zone, xp, level, nextLeve
         </div>
       )}
 
-      {showHints && (
+      {showHints && !showTouchControls && (
         <div className="absolute bottom-4 right-4 pointer-events-none select-none">
           <div className="bg-stone-900/75 backdrop-blur-sm border border-stone-700/60 rounded-xl px-3 py-2.5 shadow-xl space-y-1.5">
             <div className="text-[10px] font-bold tracking-widest text-stone-400 uppercase mb-1.5">

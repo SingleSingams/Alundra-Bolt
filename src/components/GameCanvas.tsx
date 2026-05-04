@@ -253,6 +253,7 @@ export function GameCanvas() {
         nextLevelXp={nextLevelXp}
         minimapData={minimapData}
         showHints={settings.showHints}
+        showTouchControls={settings.showTouchControls}
         shieldCharges={shieldCharges}
         bossHp={bossHp}
         onUsePotion={handleUsePotion}
