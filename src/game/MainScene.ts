@@ -39,6 +39,8 @@ import {
   XP_THRESHOLDS,
   MinimapData,
   LevelUpSkill,
+  NG_PLUS_HP_MULT,
+  NG_PLUS_DAMAGE_MULT,
 } from './constants';
 import { SaveSystem } from './SaveSystem';
 import { Boss } from './Boss';
@@ -89,6 +91,7 @@ export class MainScene extends Phaser.Scene {
   private killedEnemyIds = new Set<string>();
   private exploredChunks = new Set<string>();
   private readonly CHUNK_SIZE = 4;
+  private ngPlus = 0;
 
   constructor() {
     super({ key: 'MainScene' });
@@ -131,6 +134,7 @@ export class MainScene extends Phaser.Scene {
       this.inventory = save.inventory.slice(0, MAX_INVENTORY);
       this.xp = save.xp ?? 0;
       this.level = save.level ?? 1;
+      this.ngPlus = save.ngPlus ?? 0;
       this.killedEnemyIds = new Set(save.killedEnemies ?? []);
       this.recalculateAttackDamage();
       this.emitInventoryChange();
@@ -477,7 +481,9 @@ export class MainScene extends Phaser.Scene {
       if (this.killedEnemyIds.has(id)) continue;
       const px = spawn.tx * TILE_SIZE + TILE_SIZE / 2;
       const py = spawn.ty * TILE_SIZE + TILE_SIZE / 2;
-      const enemy = new Enemy(this, px, py, spawn.axis, this.level, spawn.type ?? 'basic');
+      const hpMult = Math.pow(NG_PLUS_HP_MULT, this.ngPlus);
+      const dmgMult = Math.pow(NG_PLUS_DAMAGE_MULT, this.ngPlus);
+      const enemy = new Enemy(this, px, py, spawn.axis, this.level, spawn.type ?? 'basic', hpMult, dmgMult);
       enemy.setName(id);
       this.enemies.push(enemy);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -600,6 +606,9 @@ export class MainScene extends Phaser.Scene {
     this.spawnWorldItem(x - 24, y, 'heart_pickup');
     this.spawnWorldItem(x + 24, y, 'heart_pickup');
     this.spawnWorldItem(x, y - 24, 'heart_pickup');
+    this.time.delayedCall(1800, () => {
+      this.game.events.emit(GAME_EVENTS.VICTORY, { ngPlus: this.ngPlus, level: this.level, xp: this.xp });
+    });
   }
 
   // ─── Transitions ──────────────────────────────────────────────────────────
@@ -896,6 +905,7 @@ export class MainScene extends Phaser.Scene {
       level: this.level,
       savedAt: Date.now(),
       killedEnemies: [...this.killedEnemyIds],
+      ngPlus: this.ngPlus,
     });
   }
 

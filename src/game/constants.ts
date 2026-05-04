@@ -69,7 +69,11 @@ export const GAME_EVENTS = {
   BOSS_HP: 'boss-hp',
   LEVEL_UP_CHOICE: 'level-up-choice',
   LEVEL_UP_CHOSEN: 'level-up-chosen',
+  VICTORY: 'victory',
 } as const;
+
+export const NG_PLUS_HP_MULT = 1.5;
+export const NG_PLUS_DAMAGE_MULT = 1.25;
 
 export type LevelUpSkill = 'hp_up' | 'attack_up' | 'shield' | 'xp_boost' | 'speed_up';
 

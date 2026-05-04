@@ -8,6 +8,7 @@ export interface SaveData {
   level: number;
   savedAt: number;
   killedEnemies: string[];
+  ngPlus: number;
 }
 
 export interface SlotPreview {
@@ -31,6 +32,7 @@ const defaults: SaveData = {
   level: 1,
   savedAt: 0,
   killedEnemies: [],
+  ngPlus: 0,
 };
 
 function parseSlot(slot: number): SaveData | null {
@@ -46,6 +48,7 @@ function parseSlot(slot: number): SaveData | null {
       level: p.level ?? defaults.level,
       savedAt: p.savedAt ?? defaults.savedAt,
       killedEnemies: p.killedEnemies ?? defaults.killedEnemies,
+      ngPlus: p.ngPlus ?? defaults.ngPlus,
     };
   } catch {
     return null;

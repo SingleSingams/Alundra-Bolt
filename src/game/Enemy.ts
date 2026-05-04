@@ -35,16 +35,16 @@ export class Enemy extends Phaser.GameObjects.Container {
   private shootCooldown = 0;
   private chaseSpeed: number;
 
-  constructor(scene: Phaser.Scene, x: number, y: number, patrolAxis: PatrolAxis = 'x', level = 1, type: EnemyType = 'basic') {
+  constructor(scene: Phaser.Scene, x: number, y: number, patrolAxis: PatrolAxis = 'x', level = 1, type: EnemyType = 'basic', hpMult = 1, damageMult = 1) {
     super(scene, x, y);
 
     this.patrolCenter = new Phaser.Math.Vector2(x, y);
     this.patrolAxis = patrolAxis;
     this.enemyType = type;
     const idx = Math.min(level - 1, ENEMY_HP_SCALE.length - 1);
-    this.maxHp = Math.round(ENEMY_MAX_HP * ENEMY_HP_SCALE[idx]);
+    this.maxHp = Math.round(ENEMY_MAX_HP * ENEMY_HP_SCALE[idx] * hpMult);
     this.hp = this.maxHp;
-    this.contactDamage = ENEMY_DAMAGE_SCALE[idx];
+    this.contactDamage = Math.round(ENEMY_DAMAGE_SCALE[idx] * damageMult);
     this.chaseSpeed = type === 'speedrunner' ? ENEMY_SPEED * 2.1 : ENEMY_SPEED;
 
     this.ensureTextures(scene);

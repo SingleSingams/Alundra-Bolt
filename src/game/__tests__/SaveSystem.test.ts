@@ -11,6 +11,7 @@ const FULL_SAVE = {
   level: 3,
   savedAt: 1000,
   killedEnemies: ['grasslands:14,14', 'forest:30,14'],
+  ngPlus: 0,
 };
 
 describe('SaveSystem', () => {

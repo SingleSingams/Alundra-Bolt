@@ -23,6 +23,7 @@ import { TouchControls } from './TouchControls';
 import { LoadingScreen } from './LoadingScreen';
 import { SkillChoiceScreen } from './SkillChoiceScreen';
 import { MainMenuScreen } from './MainMenuScreen';
+import { VictoryScreen } from './VictoryScreen';
 
 export function GameCanvas() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -43,6 +44,7 @@ export function GameCanvas() {
   const [bossHp, setBossHp] = useState<{ hp: number; maxHp: number; phase: number } | null>(null);
   const [skillChoice, setSkillChoice] = useState<{ level: number; skills: LevelUpSkill[] } | null>(null);
   const [paused, setPaused] = useState(false);
+  const [victory, setVictory] = useState<{ ngPlus: number } | null>(null);
   const [settings, setSettings] = useState<Settings>(() => SettingsSystem.load());
   const [loadProgress, setLoadProgress] = useState(0);
   const [loaded, setLoaded] = useState(false);
@@ -77,6 +79,7 @@ export function GameCanvas() {
     setTimeout(() => setSaveNotice(false), 2500);
   }, []);
   const handleGameOver = useCallback(() => setGameOver(true), []);
+  const handleVictory = useCallback((data: { ngPlus: number }) => setVictory(data), []);
   const handleXpChange = useCallback(
     (data: { xp: number; level: number; nextLevelXp: number | null }) => {
       setXp(data.xp);
@@ -152,6 +155,7 @@ export function GameCanvas() {
     game.events.on(GAME_EVENTS.SHIELD_CHANGE, handleShieldChange);
     game.events.on(GAME_EVENTS.BOSS_HP, handleBossHp);
     game.events.on(GAME_EVENTS.LEVEL_UP_CHOICE, handleLevelUpChoice);
+    game.events.on(GAME_EVENTS.VICTORY, handleVictory);
 
     return () => {
       game.events.off(GAME_EVENTS.HP_CHANGE, handleHpChange);
@@ -170,6 +174,7 @@ export function GameCanvas() {
       game.events.off(GAME_EVENTS.SHIELD_CHANGE, handleShieldChange);
       game.events.off(GAME_EVENTS.BOSS_HP, handleBossHp);
       game.events.off(GAME_EVENTS.LEVEL_UP_CHOICE, handleLevelUpChoice);
+      game.events.off(GAME_EVENTS.VICTORY, handleVictory);
       game.destroy(true);
       gameRef.current = null;
     };
@@ -190,6 +195,7 @@ export function GameCanvas() {
     handleShieldChange,
     handleBossHp,
     handleLevelUpChoice,
+    handleVictory,
     gameStarted,
   ]);
 
@@ -276,6 +282,7 @@ export function GameCanvas() {
         onClose={closeDialog}
       />
       <GameOverScreen isOpen={gameOver} level={level} xp={xp} zone={zone} />
+      <VictoryScreen isOpen={victory !== null} level={level} xp={xp} ngPlus={victory?.ngPlus ?? 0} />
       {!loaded && <LoadingScreen progress={loadProgress} />}
       {skillChoice && (
         <SkillChoiceScreen
