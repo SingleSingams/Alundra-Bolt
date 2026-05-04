@@ -440,6 +440,12 @@ export class MainScene extends Phaser.Scene {
     this.player.setDepth(this.player.y + 1);
 
     this.game.events.emit(GAME_EVENTS.ZONE_CHANGE, this.currentZone);
+
+    const musicTheme = zone === 'boss_room' ? 'boss'
+      : zone === 'dungeon' || zone === 'dungeon_interior' ? 'dungeon'
+      : zone === 'forest' ? 'forest'
+      : 'grasslands';
+    SoundSystem.startMusic(musicTheme);
   }
 
   private clearZoneContent(): void {

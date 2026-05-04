@@ -1,13 +1,22 @@
 type OscType = OscillatorType;
 
+type ZoneTheme = 'grasslands' | 'forest' | 'dungeon' | 'boss';
+
 class SoundSystemClass {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
+  private musicGain: GainNode | null = null;
   private volumeMultiplier = 1;
+  private musicOscs: OscillatorNode[] = [];
+  private musicTimeout: ReturnType<typeof setTimeout> | null = null;
+  private currentTheme: ZoneTheme | null = null;
 
   setVolume(v: number): void {
     this.volumeMultiplier = Math.max(0, Math.min(1, v));
     if (this.master) this.master.gain.value = 0.18 * this.volumeMultiplier;
+    if (this.musicGain && this.ctx) {
+      this.musicGain.gain.setTargetAtTime(0.06 * this.volumeMultiplier, this.ctx.currentTime, 0.1);
+    }
   }
 
   private ensure(): AudioContext | null {
@@ -17,10 +26,135 @@ class SoundSystemClass {
       this.master = this.ctx.createGain();
       this.master.gain.value = 0.18 * this.volumeMultiplier;
       this.master.connect(this.ctx.destination);
+
+      this.musicGain = this.ctx.createGain();
+      this.musicGain.gain.value = 0.06 * this.volumeMultiplier;
+      this.musicGain.connect(this.ctx.destination);
     } catch {
       return null;
     }
     return this.ctx;
+  }
+
+  // ─── Ambient music ────────────────────────────────────────────────────────
+
+  private stopMusic(): void {
+    if (this.musicTimeout) { clearTimeout(this.musicTimeout); this.musicTimeout = null; }
+    const ctx = this.ctx;
+    const g = this.musicGain;
+    if (ctx && g) {
+      g.gain.setTargetAtTime(0, ctx.currentTime, 0.5);
+    }
+    this.musicOscs.forEach(o => { try { o.stop(ctx ? ctx.currentTime + 1 : 0); } catch { /**/ } });
+    this.musicOscs = [];
+  }
+
+  private playDrone(freq: number, type: OscType, gainVal: number): OscillatorNode | null {
+    const ctx = this.ctx;
+    if (!ctx || !this.musicGain) return null;
+    const osc = ctx.createOscillator();
+    const env = ctx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    env.gain.value = gainVal;
+    osc.connect(env);
+    env.connect(this.musicGain);
+    osc.start();
+    this.musicOscs.push(osc);
+    return osc;
+  }
+
+  private scheduleGrasslandsPhrase(): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.musicGain || this.currentTheme !== 'grasslands') return;
+    const melody = [523, 659, 784, 880, 784, 659, 523, 440];
+    const dur = 0.28;
+    melody.forEach((freq, i) => {
+      const o = ctx.createOscillator();
+      const e = ctx.createGain();
+      o.type = 'sine'; o.frequency.value = freq;
+      e.gain.setValueAtTime(0.001, ctx.currentTime + i * dur);
+      e.gain.linearRampToValueAtTime(0.45, ctx.currentTime + i * dur + 0.04);
+      e.gain.setTargetAtTime(0.001, ctx.currentTime + i * dur + dur * 0.7, 0.05);
+      o.connect(e); e.connect(this.musicGain!);
+      o.start(ctx.currentTime + i * dur);
+      o.stop(ctx.currentTime + i * dur + dur + 0.05);
+    });
+    this.musicTimeout = setTimeout(() => this.scheduleGrasslandsPhrase(), melody.length * dur * 1000 + 3000);
+  }
+
+  private scheduleDungeonPhrase(): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.musicGain || this.currentTheme !== 'dungeon') return;
+    const pattern = [110, 0, 82, 0, 98, 0, 73, 110];
+    const dur = 0.38;
+    pattern.forEach((freq, i) => {
+      if (!freq) return;
+      const o = ctx.createOscillator();
+      const e = ctx.createGain();
+      o.type = 'sawtooth'; o.frequency.value = freq;
+      e.gain.setValueAtTime(0.001, ctx.currentTime + i * dur);
+      e.gain.linearRampToValueAtTime(0.5, ctx.currentTime + i * dur + 0.05);
+      e.gain.setTargetAtTime(0.001, ctx.currentTime + i * dur + dur * 0.6, 0.06);
+      o.connect(e); e.connect(this.musicGain!);
+      o.start(ctx.currentTime + i * dur);
+      o.stop(ctx.currentTime + i * dur + dur + 0.05);
+    });
+    this.musicTimeout = setTimeout(() => this.scheduleDungeonPhrase(), pattern.length * dur * 1000 + 2000);
+  }
+
+  private scheduleBossPhrase(): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.musicGain || this.currentTheme !== 'boss') return;
+    const pattern = [220, 220, 293, 220, 196, 220, 164, 196];
+    const dur = 0.22;
+    pattern.forEach((freq, i) => {
+      const o = ctx.createOscillator();
+      const e = ctx.createGain();
+      o.type = 'sawtooth'; o.frequency.value = freq;
+      e.gain.setValueAtTime(0.001, ctx.currentTime + i * dur);
+      e.gain.linearRampToValueAtTime(0.6, ctx.currentTime + i * dur + 0.03);
+      e.gain.setTargetAtTime(0.001, ctx.currentTime + i * dur + dur * 0.5, 0.04);
+      o.connect(e); e.connect(this.musicGain!);
+      o.start(ctx.currentTime + i * dur);
+      o.stop(ctx.currentTime + i * dur + dur + 0.04);
+    });
+    this.musicTimeout = setTimeout(() => this.scheduleBossPhrase(), pattern.length * dur * 1000 + 800);
+  }
+
+  startMusic(theme: ZoneTheme): void {
+    const ctx = this.ensure();
+    if (!ctx || !this.musicGain) return;
+    if (this.currentTheme === theme) return;
+    this.stopMusic();
+    this.currentTheme = theme;
+    this.musicGain.gain.setTargetAtTime(0.06 * this.volumeMultiplier, ctx.currentTime, 0.8);
+
+    if (theme === 'grasslands') {
+      // Gentle drone + melodic phrase
+      this.playDrone(130, 'sine', 0.18);
+      this.playDrone(196, 'sine', 0.10);
+      this.scheduleGrasslandsPhrase();
+    } else if (theme === 'forest') {
+      // Low mysterious drone
+      this.playDrone(98, 'sine', 0.22);
+      this.playDrone(146, 'triangle', 0.12);
+      this.playDrone(73, 'sine', 0.08);
+    } else if (theme === 'dungeon') {
+      // Dark pulsing pattern
+      this.playDrone(55, 'sawtooth', 0.15);
+      this.scheduleDungeonPhrase();
+    } else if (theme === 'boss') {
+      // Intense boss theme
+      this.playDrone(55, 'sawtooth', 0.20);
+      this.playDrone(82, 'sawtooth', 0.12);
+      this.scheduleBossPhrase();
+    }
+  }
+
+  stopMusicFade(): void {
+    this.currentTheme = null;
+    this.stopMusic();
   }
 
   private tone(
