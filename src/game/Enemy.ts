@@ -76,54 +76,112 @@ export class Enemy extends Phaser.GameObjects.Container {
   }
 
   private ensureTextures(scene: Phaser.Scene): void {
+    // Basic enemy – red orc-like creature
     if (!scene.textures.exists('enemy')) {
       const g = scene.add.graphics();
       const s = 24;
-      g.fillStyle(0xb91c1c, 1); g.fillRect(2, 5, s - 4, s - 7);
-      g.fillStyle(0xef4444, 1); g.fillRect(3, 6, s - 6, 4);
-      g.fillStyle(0xffffff, 1); g.fillCircle(7, 11, 3.5); g.fillCircle(s - 7, 11, 3.5);
-      g.fillStyle(0x111111, 1); g.fillCircle(7, 12, 1.8); g.fillCircle(s - 7, 12, 1.8);
-      g.fillStyle(0x7f1d1d, 1); g.fillRect(3, 6, 7, 2); g.fillRect(s - 10, 6, 7, 2);
-      g.generateTexture('enemy', s, s); g.destroy();
+      // Legs
+      g.fillStyle(0x7f1d1d, 1); g.fillRect(5, 16, 5, 7); g.fillRect(14, 16, 5, 7);
+      // Body
+      g.fillStyle(0xb91c1c, 1); g.fillRect(3, 7, 18, 10);
+      // Belly
+      g.fillStyle(0xef4444, 1); g.fillRect(5, 9, 14, 6);
+      // Arms
+      g.fillStyle(0xb91c1c, 1); g.fillRect(0, 8, 4, 7); g.fillRect(20, 8, 4, 7);
+      // Claws
+      g.fillStyle(0xfef2f2, 1);
+      g.fillRect(0, 14, 2, 2); g.fillRect(2, 15, 2, 2);
+      g.fillRect(20, 14, 2, 2); g.fillRect(22, 15, 2, 2);
+      // Head
+      g.fillStyle(0xef4444, 1); g.fillRect(4, 0, 16, 8);
+      // Horns
+      g.fillStyle(0x7f1d1d, 1);
+      g.fillTriangle(4, 0, 7, 0, 5, -4);
+      g.fillTriangle(17, 0, 20, 0, 19, -4);
+      // Eyes
+      g.fillStyle(0xfef08a, 1); g.fillCircle(9, 4, 3); g.fillCircle(15, 4, 3);
+      g.fillStyle(0x111111, 1); g.fillCircle(9, 5, 1.5); g.fillCircle(15, 5, 1.5);
+      g.generateTexture('enemy', s, 24); g.destroy();
     }
 
+    // Ranger enemy – blue hooded archer
     if (!scene.textures.exists('enemy-ranger')) {
       const g = scene.add.graphics();
       const s = 22;
-      g.fillStyle(0x1d4ed8, 1); g.fillRect(2, 5, s - 4, s - 7);
-      g.fillStyle(0x3b82f6, 1); g.fillRect(3, 6, s - 6, 4);
-      g.fillStyle(0xffffff, 1); g.fillCircle(6, 11, 3); g.fillCircle(s - 6, 11, 3);
-      g.fillStyle(0x111111, 1); g.fillCircle(6, 12, 1.5); g.fillCircle(s - 6, 12, 1.5);
-      g.fillStyle(0x1e3a8a, 1); g.fillRect(3, 6, 6, 2); g.fillRect(s - 9, 6, 6, 2);
-      // Bow hint
-      g.lineStyle(2, 0x93c5fd, 1);
-      g.beginPath(); g.arc(s / 2, 18, 4, Math.PI * 1.1, Math.PI * 1.9); g.strokePath();
-      g.generateTexture('enemy-ranger', s, s); g.destroy();
+      // Legs
+      g.fillStyle(0x1e3a8a, 1); g.fillRect(4, 15, 4, 6); g.fillRect(14, 15, 4, 6);
+      // Cloak / body
+      g.fillStyle(0x1d4ed8, 1); g.fillEllipse(s / 2, 11, 16, 12);
+      g.fillStyle(0x2563eb, 1); g.fillRect(3, 7, s - 6, 7);
+      // Arms
+      g.fillStyle(0x1d4ed8, 1); g.fillRect(0, 8, 4, 6); g.fillRect(s - 4, 8, 4, 6);
+      // Bow
+      g.lineStyle(2, 0x7c3aed, 1);
+      g.beginPath(); g.arc(s - 3, 10, 5, -Math.PI * 0.6, Math.PI * 0.6); g.strokePath();
+      g.lineStyle(1, 0xfef3c7, 0.9);
+      g.lineBetween(s - 3, 5, s - 3, 15);
+      // Head / hood
+      g.fillStyle(0x1e3a8a, 1); g.fillEllipse(s / 2, 4, 12, 10);
+      g.fillStyle(0x3b82f6, 1); g.fillEllipse(s / 2, 5, 8, 6);
+      // Eyes
+      g.fillStyle(0x7dd3fc, 1); g.fillCircle(8, 4, 2); g.fillCircle(s - 8, 4, 2);
+      g.fillStyle(0x111111, 1); g.fillCircle(8, 5, 1); g.fillCircle(s - 8, 5, 1);
+      g.generateTexture('enemy-ranger', s, 22); g.destroy();
     }
 
+    // Shielder – stocky grey armored enemy
     if (!scene.textures.exists('enemy-shielder')) {
       const g = scene.add.graphics();
-      const s = 26;
-      g.fillStyle(0x57534e, 1); g.fillRect(2, 5, s - 4, s - 7);
-      g.fillStyle(0x78716c, 1); g.fillRect(3, 6, s - 6, 4);
-      g.fillStyle(0xffffff, 1); g.fillCircle(8, 12, 3.5); g.fillCircle(s - 8, 12, 3.5);
-      g.fillStyle(0x111111, 1); g.fillCircle(8, 13, 1.8); g.fillCircle(s - 8, 13, 1.8);
-      g.fillStyle(0x44403c, 1); g.fillRect(3, 6, 8, 2); g.fillRect(s - 11, 6, 8, 2);
-      g.generateTexture('enemy-shielder', s, s); g.destroy();
+      const s = 28;
+      // Legs / greaves
+      g.fillStyle(0x44403c, 1); g.fillRect(5, 17, 7, 8); g.fillRect(16, 17, 7, 8);
+      g.fillStyle(0x78716c, 1); g.fillRect(5, 21, 7, 2); g.fillRect(16, 21, 7, 2);
+      // Body armor
+      g.fillStyle(0x57534e, 1); g.fillRect(4, 7, 20, 11);
+      g.fillStyle(0x78716c, 1); g.fillRect(5, 8, 18, 5);
+      // Pauldrons (shoulder pads)
+      g.fillStyle(0x44403c, 1); g.fillEllipse(4, 9, 8, 6); g.fillEllipse(s - 4, 9, 8, 6);
+      // Shield
+      g.fillStyle(0x1e3a8a, 1); g.fillRect(-4, 8, 8, 12);
+      g.lineStyle(1.5, 0x93c5fd, 1); g.strokeRect(-4, 8, 8, 12);
+      g.fillStyle(0x3b82f6, 1); g.fillCircle(-1, 14, 3);
+      // Head / helm
+      g.fillStyle(0x57534e, 1); g.fillRect(7, 0, 14, 8);
+      g.fillStyle(0x78716c, 1); g.fillRect(6, 2, 16, 4);
+      // Eye slit
+      g.fillStyle(0x111111, 1); g.fillRect(9, 3, 10, 2);
+      g.fillStyle(0x7dd3fc, 0.8); g.fillRect(10, 3, 8, 1);
+      g.generateTexture('enemy-shielder', s, 26); g.destroy();
     }
 
+    // Speedrunner – slim orange demon
     if (!scene.textures.exists('enemy-speedrunner')) {
       const g = scene.add.graphics();
       const s = 20;
-      g.fillStyle(0xd97706, 1); g.fillRect(2, 4, s - 4, s - 6);
-      g.fillStyle(0xfbbf24, 1); g.fillRect(3, 5, s - 6, 3);
-      g.fillStyle(0xffffff, 1); g.fillCircle(6, 10, 3); g.fillCircle(s - 6, 10, 3);
-      g.fillStyle(0x111111, 1); g.fillCircle(6, 11, 1.5); g.fillCircle(s - 6, 11, 1.5);
-      g.fillStyle(0x92400e, 1); g.fillRect(2, 5, 6, 2); g.fillRect(s - 8, 5, 6, 2);
+      // Tail
+      g.fillStyle(0x92400e, 1);
+      g.fillTriangle(s - 2, 10, s + 4, 6, s + 2, 14);
+      // Legs (blurred motion)
+      g.fillStyle(0xd97706, 1); g.fillRect(3, 14, 4, 6); g.fillRect(13, 14, 4, 6);
+      g.fillStyle(0x92400e, 0.5); g.fillRect(1, 14, 4, 4); g.fillRect(11, 14, 4, 4);
+      // Body
+      g.fillStyle(0xd97706, 1); g.fillRect(3, 6, 14, 9);
+      g.fillStyle(0xfbbf24, 1); g.fillRect(4, 7, 12, 5);
+      // Arms
+      g.fillStyle(0xd97706, 1); g.fillRect(0, 7, 3, 6); g.fillRect(s - 3, 7, 3, 6);
+      // Head
+      g.fillStyle(0xf59e0b, 1); g.fillEllipse(s / 2, 4, 12, 8);
+      // Horns
+      g.fillStyle(0x78350f, 1);
+      g.fillTriangle(5, 1, 8, 1, 6, -3);
+      g.fillTriangle(12, 1, 15, 1, 14, -3);
+      // Eyes (angry)
+      g.fillStyle(0xff0000, 1); g.fillCircle(7, 4, 2); g.fillCircle(13, 4, 2);
+      g.fillStyle(0x111111, 1); g.fillCircle(7, 5, 1); g.fillCircle(13, 5, 1);
       // Speed lines
-      g.lineStyle(1.5, 0xfef3c7, 0.8);
-      g.lineBetween(0, 8, 3, 8); g.lineBetween(0, 12, 4, 12);
-      g.generateTexture('enemy-speedrunner', s, s); g.destroy();
+      g.lineStyle(1.5, 0xfef3c7, 0.7);
+      g.lineBetween(-3, 7, 2, 7); g.lineBetween(-4, 11, 1, 11);
+      g.generateTexture('enemy-speedrunner', s + 6, 21); g.destroy();
     }
   }
 

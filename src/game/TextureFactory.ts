@@ -16,11 +16,10 @@ function drawGrassTile(
   seed: number
 ): void {
   const size = TILE_SIZE;
+  const rng = (n: number) => Math.abs(Math.sin(seed * 9301 + n * 49297) * 0.5 + 0.5);
 
   ctx.fillStyle = palette.base;
   ctx.fillRect(offsetX, 0, size, size);
-
-  const rng = (n: number) => Math.abs(Math.sin(seed * 9301 + n * 49297) * 0.5 + 0.5);
 
   ctx.fillStyle = palette.detail;
   for (let i = 0; i < 8; i++) {
@@ -61,25 +60,74 @@ export function createPlayerTexture(scene: Phaser.Scene): void {
   if (scene.textures.exists('player')) return;
 
   const gfx = scene.add.graphics();
-  const size = 24;
+  const W = 24, H = 28;
+  const cx = W / 2;
 
-  gfx.fillStyle(0x3b82f6, 1);
-  gfx.fillEllipse(size / 2, size / 2 + 2, size - 4, size - 6);
-
-  gfx.fillStyle(0xfde68a, 1);
-  gfx.fillCircle(size / 2, size / 2 - 1, 8);
-
-  gfx.fillStyle(0x1e40af, 1);
-  gfx.fillCircle(size / 2, size / 2 - 1, 4);
-
+  // Legs (two stumps)
   gfx.fillStyle(0x1e3a8a, 1);
-  gfx.fillTriangle(
-    size / 2, size / 2 - 11,
-    size / 2 - 3, size / 2 - 6,
-    size / 2 + 3, size / 2 - 6
-  );
+  gfx.fillRect(cx - 5, H - 8, 4, 7);
+  gfx.fillRect(cx + 1, H - 8, 4, 7);
 
-  gfx.generateTexture('player', size, size);
+  // Boots
+  gfx.fillStyle(0x78350f, 1);
+  gfx.fillRect(cx - 6, H - 4, 5, 4);
+  gfx.fillRect(cx + 1, H - 4, 5, 4);
+
+  // Body / tunic
+  gfx.fillStyle(0x2563eb, 1);
+  gfx.fillRect(cx - 6, H - 18, 12, 10);
+
+  // Belt
+  gfx.fillStyle(0x92400e, 1);
+  gfx.fillRect(cx - 6, H - 10, 12, 2);
+  gfx.fillStyle(0xfbbf24, 1);
+  gfx.fillRect(cx - 1, H - 11, 3, 3);
+
+  // Left arm
+  gfx.fillStyle(0xfbbf24, 1);
+  gfx.fillRect(cx - 10, H - 18, 4, 8);
+
+  // Right arm (sword arm)
+  gfx.fillStyle(0xfbbf24, 1);
+  gfx.fillRect(cx + 6, H - 18, 4, 7);
+
+  // Sword
+  gfx.fillStyle(0xd1d5db, 1);
+  gfx.fillRect(cx + 10, H - 24, 2, 10);
+  gfx.fillStyle(0xfbbf24, 1);
+  gfx.fillRect(cx + 8, H - 16, 6, 2);
+  gfx.fillStyle(0x92400e, 1);
+  gfx.fillRect(cx + 10, H - 15, 2, 3);
+
+  // Neck
+  gfx.fillStyle(0xfde68a, 1);
+  gfx.fillRect(cx - 2, H - 22, 4, 4);
+
+  // Head
+  gfx.fillStyle(0xfde68a, 1);
+  gfx.fillRect(cx - 5, H - 30, 10, 10);
+
+  // Eyes
+  gfx.fillStyle(0x1e1b4b, 1);
+  gfx.fillRect(cx - 3, H - 27, 2, 2);
+  gfx.fillRect(cx + 1, H - 27, 2, 2);
+
+  // Eye shine
+  gfx.fillStyle(0xffffff, 1);
+  gfx.fillRect(cx - 3, H - 27, 1, 1);
+  gfx.fillRect(cx + 1, H - 27, 1, 1);
+
+  // Hair / hat brim
+  gfx.fillStyle(0x1e3a8a, 1);
+  gfx.fillRect(cx - 6, H - 32, 12, 3);
+  // Hat top
+  gfx.fillRect(cx - 4, H - 36, 8, 4);
+
+  // Hat feather
+  gfx.fillStyle(0xfbbf24, 1);
+  gfx.fillRect(cx + 2, H - 37, 2, 5);
+
+  gfx.generateTexture('player', W, H);
   gfx.destroy();
 }
 
@@ -97,11 +145,27 @@ export function createHeartTexture(scene: Phaser.Scene): void {
   if (scene.textures.exists('heart-full') && scene.textures.exists('heart-empty')) return;
 
   const drawHeart = (gfx: Phaser.GameObjects.Graphics, filled: boolean) => {
-    const color = filled ? 0xe53e3e : 0x4a5568;
-    gfx.fillStyle(color, 1);
-    gfx.fillCircle(6, 6, 5);
-    gfx.fillCircle(12, 6, 5);
-    gfx.fillTriangle(1, 8, 17, 8, 9, 17);
+    if (filled) {
+      gfx.fillStyle(0x7f1d1d, 1);
+      gfx.fillCircle(6, 6, 5);
+      gfx.fillCircle(12, 6, 5);
+      gfx.fillTriangle(1, 8, 17, 8, 9, 17);
+      gfx.fillStyle(0xef4444, 1);
+      gfx.fillCircle(6, 5, 4);
+      gfx.fillCircle(12, 5, 4);
+      gfx.fillTriangle(2, 7, 16, 7, 9, 16);
+      gfx.fillStyle(0xfca5a5, 0.6);
+      gfx.fillEllipse(6, 4, 4, 2);
+    } else {
+      gfx.fillStyle(0x374151, 1);
+      gfx.fillCircle(6, 6, 5);
+      gfx.fillCircle(12, 6, 5);
+      gfx.fillTriangle(1, 8, 17, 8, 9, 17);
+      gfx.fillStyle(0x4b5563, 1);
+      gfx.fillCircle(6, 5, 4);
+      gfx.fillCircle(12, 5, 4);
+      gfx.fillTriangle(2, 7, 16, 7, 9, 16);
+    }
   };
 
   const gfxFull = scene.add.graphics();
