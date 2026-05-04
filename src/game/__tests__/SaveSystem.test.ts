@@ -51,7 +51,7 @@ describe('SaveSystem', () => {
   });
 
   it('uses defaults for missing fields on partial data', () => {
-    localStorage.setItem('verdant-chronicles-save', JSON.stringify({ hp: 3 }));
+    localStorage.setItem('verdant-chronicles-save-0', JSON.stringify({ hp: 3 }));
     const loaded = SaveSystem.load();
     expect(loaded?.hp).toBe(3);
     expect(loaded?.zone).toBe('grasslands');
@@ -68,7 +68,7 @@ describe('SaveSystem', () => {
   });
 
   it('returns null on corrupt JSON', () => {
-    localStorage.setItem('verdant-chronicles-save', 'not-valid-json{{');
+    localStorage.setItem('verdant-chronicles-save-0', 'not-valid-json{{');
     expect(SaveSystem.load()).toBeNull();
   });
 });

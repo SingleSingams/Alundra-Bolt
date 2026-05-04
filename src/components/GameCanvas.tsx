@@ -118,12 +118,14 @@ export function GameCanvas() {
     gameRef.current?.events.emit(GAME_EVENTS.DIALOG_CLOSE);
   }, []);
 
-  const handleNewGame = useCallback(() => {
+  const handleNewGame = useCallback((slot: number) => {
+    SaveSystem.setSlot(slot);
     SaveSystem.clear();
     setGameStarted(true);
   }, []);
 
-  const handleContinue = useCallback(() => {
+  const handleContinue = useCallback((slot: number) => {
+    SaveSystem.setSlot(slot);
     setGameStarted(true);
   }, []);
 
