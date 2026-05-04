@@ -1,4 +1,5 @@
 import { GameCanvas } from './components/GameCanvas';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { Badge } from './components/ui/badge';
 import { Separator } from './components/ui/separator';
 import { SaveSystem } from './game/SaveSystem';
@@ -73,7 +74,9 @@ export default function App() {
     <div className="flex flex-col w-screen h-screen bg-stone-950 overflow-hidden">
       <TitleBar />
       <main className="flex-1 relative overflow-hidden min-h-0">
-        <GameCanvas />
+        <ErrorBoundary>
+          <GameCanvas />
+        </ErrorBoundary>
       </main>
       <StatusBar />
     </div>
