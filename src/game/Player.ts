@@ -14,7 +14,6 @@ import {
   ATTACK_ZONE_HEIGHT,
   ATTACK_OFFSET,
   ZoneId,
-  ZONE_BOB_FREQ,
 } from './constants';
 import { VirtualInput } from './VirtualInput';
 
@@ -59,8 +58,6 @@ export class Player extends Phaser.GameObjects.Container {
   private lastDirection: FacingDirection = 's';
   private hp: number = MAX_HP;
   private invincibleTimer = 0;
-  private stepBob = 0;
-
   private isAttacking = false;
   private attackCooldown = 0;
   private attackTimer = 0;
@@ -70,7 +67,6 @@ export class Player extends Phaser.GameObjects.Container {
   private frozen = false;
   private shieldCharges = 0;
 
-  private zoneBobMult = 1.0;
   private speedMult = 1.0;
 
   // Cached per-frame key states — JustDown consumes the flag on first call,
@@ -129,21 +125,8 @@ export class Player extends Phaser.GameObjects.Container {
     };
   }
 
-  private drawDirectionIndicator(dir: Direction): void {
-    this.directionIndicator.clear();
-    if (dir === 'idle') return;
-
-    const angle = Phaser.Math.DegToRad(DIRECTION_ANGLES[dir]);
-    const dist = 11;
-    const tx = Math.cos(angle) * dist;
-    const ty = Math.sin(angle) * dist;
-
-    this.directionIndicator.fillStyle(0xfde68a, 1);
-    this.directionIndicator.fillTriangle(
-      tx + Math.cos(angle) * 4, ty + Math.sin(angle) * 4,
-      tx + Math.cos(angle + Math.PI * 0.8) * 5, ty + Math.sin(angle + Math.PI * 0.8) * 5,
-      tx + Math.cos(angle - Math.PI * 0.8) * 5, ty + Math.sin(angle - Math.PI * 0.8) * 5
-    );
+  private drawDirectionIndicator(_dir: Direction): void {
+    // Direction triangle hidden — the knight sprite's facing/flip shows direction.
   }
 
   update(delta: number): void {
@@ -414,15 +397,8 @@ export class Player extends Phaser.GameObjects.Container {
     this.directionIndicator.y = this.jumpOffset;
   }
 
-  private updateBob(delta: number): void {
-    const body = this.body as Phaser.Physics.Arcade.Body;
-    const moving = body.velocity.x !== 0 || body.velocity.y !== 0;
-
-    if (moving && !this.isJumping && !this.isAttacking) {
-      this.stepBob += delta * 0.009 * this.zoneBobMult;
-      this.sprite.y = this.jumpOffset + Math.sin(this.stepBob * Math.PI) * 1.5;
-      this.directionIndicator.y = this.sprite.y;
-    }
+  private updateBob(_delta: number): void {
+    // Step bob removed — walk animation provides the movement feel.
   }
 
   private updateInvincibility(delta: number): void {
@@ -478,8 +454,8 @@ export class Player extends Phaser.GameObjects.Container {
     this.scene.game.events.emit(GAME_EVENTS.HP_CHANGE, this.hp);
   }
 
-  setZone(zone: ZoneId): void {
-    this.zoneBobMult = ZONE_BOB_FREQ[zone] ?? 1.0;
+  setZone(_zone: ZoneId): void {
+    // Bob multiplier removed — walk animation handles movement feel per zone.
   }
 
   getHp(): number {

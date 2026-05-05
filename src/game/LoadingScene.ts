@@ -33,8 +33,8 @@ export class LoadingScene extends Phaser.Scene {
     });
     this.anims.create({
       key: 'knight-walk',
-      frames: this.anims.generateFrameNumbers('knight', { start: 0, end: 3 }),
-      frameRate: 8,
+      frames: this.anims.generateFrameNumbers('knight', { start: 0, end: 1 }),
+      frameRate: 5,
       repeat: -1,
     });
     this.anims.create({
