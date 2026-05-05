@@ -38,6 +38,7 @@ export const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
       {
         id: 'elara',
         name: 'Elara die Kräuterkundige',
+        portrait: 'assets/portraits/youngster.png',
         x: cx - 110,
         y: cy - 60,
         lines: [
@@ -49,6 +50,7 @@ export const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
       {
         id: 'magnus',
         name: 'Alter Magnus',
+        portrait: 'assets/portraits/explorer.png',
         x: cx + 110,
         y: cy - 60,
         lines: [
@@ -80,6 +82,7 @@ export const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
       {
         id: 'theron',
         name: 'Theron der Wanderer',
+        portrait: 'assets/portraits/explorer.png',
         x: cx - 120,
         y: cy + 80,
         lines: [
@@ -114,6 +117,7 @@ export const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
       {
         id: 'arwen',
         name: 'Arwen, Gefallene Späher',
+        portrait: 'assets/portraits/youngster.png',
         x: cx + 80,
         y: cy - 80,
         lines: [

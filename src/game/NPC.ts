@@ -8,12 +8,14 @@ export interface NPCDefinition {
   lines: string[];
   x: number;
   y: number;
+  portrait?: string;
 }
 
 export class NPC extends Phaser.GameObjects.Container {
   public readonly npcId: string;
   public readonly npcName: string;
   public readonly lines: string[];
+  public readonly portrait?: string;
 
   private sprite: Phaser.GameObjects.Sprite;
   private shadow: Phaser.GameObjects.Image;
@@ -27,6 +29,7 @@ export class NPC extends Phaser.GameObjects.Container {
     this.npcId = def.id;
     this.npcName = def.name;
     this.lines = def.lines;
+    this.portrait = def.portrait;
 
     const useSprite = scene.textures.exists('npc-elder');
     this.shadow = scene.add.image(0, 14, 'shadow').setAlpha(0.45).setScale(1.4, 0.45);

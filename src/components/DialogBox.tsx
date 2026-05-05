@@ -1,16 +1,35 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Card } from './ui/card';
 import { cn } from '../lib/utils';
-import { MessageSquare, ChevronRight } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 
 interface DialogBoxProps {
   isOpen: boolean;
   npcName: string;
   lines: string[];
+  portrait?: string;
   onClose: () => void;
 }
 
-export function DialogBox({ isOpen, npcName, lines, onClose }: DialogBoxProps) {
+// Portrait images are multi-pose sheets (3 cols × 2 rows).
+// background-size: 300% shows exactly 1 column (the first/idle pose).
+function Portrait({ src, name }: { src: string; name: string }) {
+  return (
+    <div
+      className="w-14 h-14 rounded-lg border-2 border-amber-600/60 shadow-lg flex-shrink-0 overflow-hidden"
+      style={{
+        backgroundImage: `url(${src})`,
+        backgroundSize: '300% auto',
+        backgroundPosition: '0% 0%',
+        backgroundRepeat: 'no-repeat',
+        imageRendering: 'auto',
+      }}
+      aria-label={name}
+    />
+  );
+}
+
+export function DialogBox({ isOpen, npcName, lines, portrait, onClose }: DialogBoxProps) {
   const [pageIndex, setPageIndex] = useState(0);
   const [displayed, setDisplayed] = useState('');
   const typeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -22,7 +41,6 @@ export function DialogBox({ isOpen, npcName, lines, onClose }: DialogBoxProps) {
 
   const currentLine = lines[pageIndex] ?? '';
 
-  // Typewriter effect
   useEffect(() => {
     if (typeIntervalRef.current) {
       clearInterval(typeIntervalRef.current);
@@ -55,7 +73,6 @@ export function DialogBox({ isOpen, npcName, lines, onClose }: DialogBoxProps) {
 
   const advance = useCallback(() => {
     if (!isOpen) return;
-    // Skip typewriter if still animating
     if (isTypingRef.current) {
       if (typeIntervalRef.current) {
         clearInterval(typeIntervalRef.current);
@@ -66,10 +83,7 @@ export function DialogBox({ isOpen, npcName, lines, onClose }: DialogBoxProps) {
       return;
     }
     setPageIndex((prev) => {
-      if (prev + 1 >= lines.length) {
-        onClose();
-        return prev;
-      }
+      if (prev + 1 >= lines.length) { onClose(); return prev; }
       return prev + 1;
     });
   }, [isOpen, lines, pageIndex, onClose]);
@@ -78,11 +92,9 @@ export function DialogBox({ isOpen, npcName, lines, onClose }: DialogBoxProps) {
     if (!isOpen) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'z' || e.key === 'Z' || e.key === ' ' || e.key === 'Enter') {
-        e.preventDefault();
-        advance();
+        e.preventDefault(); advance();
       } else if (e.key === 'Escape') {
-        e.preventDefault();
-        onClose();
+        e.preventDefault(); onClose();
       }
     };
     window.addEventListener('keydown', handler);
@@ -101,36 +113,36 @@ export function DialogBox({ isOpen, npcName, lines, onClose }: DialogBoxProps) {
     >
       <div className="pointer-events-auto w-full max-w-xl animate-in slide-in-from-bottom-4 fade-in duration-200">
         <Card className="bg-stone-900/95 border-amber-600/50 border-2 backdrop-blur-md shadow-2xl overflow-hidden">
-          <div className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-amber-900/40 to-stone-900/40 border-b border-amber-700/40">
-            <div className="w-6 h-6 rounded-full bg-blue-700 border border-blue-400/60 flex items-center justify-center shadow-inner flex-shrink-0">
-              <MessageSquare className="w-3 h-3 text-blue-100" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-amber-100 font-semibold text-sm leading-tight truncate">
-                {npcName}
+
+          {/* Header */}
+          <div className="flex items-center gap-3 px-3 py-2 bg-gradient-to-r from-amber-900/40 to-stone-900/40 border-b border-amber-700/40">
+            {portrait ? (
+              <Portrait src={portrait} name={npcName} />
+            ) : (
+              <div className="w-10 h-10 rounded-full bg-blue-900/60 border border-blue-500/50 flex items-center justify-center flex-shrink-0 text-lg">
+                💬
               </div>
-            </div>
-            <div className="flex gap-1 flex-shrink-0">
-              {lines.map((_, i) => (
-                <div
-                  key={i}
-                  className={cn(
-                    'w-1.5 h-1.5 rounded-full transition-all duration-300',
-                    i === pageIndex
-                      ? 'bg-amber-400 scale-125'
-                      : i < pageIndex
-                      ? 'bg-amber-700/60'
-                      : 'bg-stone-600/60'
-                  )}
-                />
-              ))}
+            )}
+            <div className="flex-1 min-w-0">
+              <div className="text-amber-100 font-bold text-sm leading-tight truncate">{npcName}</div>
+              <div className="flex gap-1 mt-1">
+                {lines.map((_, i) => (
+                  <div
+                    key={i}
+                    className={cn(
+                      'w-1.5 h-1.5 rounded-full transition-all duration-300',
+                      i === pageIndex ? 'bg-amber-400 scale-125' : i < pageIndex ? 'bg-amber-700/60' : 'bg-stone-600/60'
+                    )}
+                  />
+                ))}
+              </div>
             </div>
           </div>
 
-          {/* Tap entire text area to advance */}
+          {/* Text */}
           <button
             onClick={advance}
-            className="w-full text-left px-4 py-3 min-h-[72px] bg-transparent border-0 outline-none"
+            className="w-full text-left px-4 py-3 min-h-[68px] bg-transparent border-0 outline-none"
             style={{ color: '#f1f0ef' }}
           >
             <p className="leading-relaxed text-sm">
@@ -141,10 +153,9 @@ export function DialogBox({ isOpen, npcName, lines, onClose }: DialogBoxProps) {
             </p>
           </button>
 
+          {/* Footer */}
           <div className="flex items-center justify-between px-3 py-2 bg-stone-950/60 border-t border-stone-700/60">
-            <div className="text-[11px] text-stone-400">
-              {pageIndex + 1} / {lines.length}
-            </div>
+            <div className="text-[11px] text-stone-400">{pageIndex + 1} / {lines.length}</div>
             <button
               onClick={advance}
               className="flex items-center gap-1.5 px-5 py-2 rounded-lg bg-amber-600/30 active:bg-amber-600/60 border border-amber-500/50 font-semibold transition-colors"

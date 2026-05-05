@@ -133,6 +133,7 @@ export const TRANSITION_EDGE_TILES = 2;
 export interface DialogPayload {
   npcName: string;
   lines: string[];
+  portrait?: string; // path relative to public/, e.g. 'assets/portraits/explorer.png'
 }
 
 export const ZONE_BOB_FREQ: Record<string, number> = {
