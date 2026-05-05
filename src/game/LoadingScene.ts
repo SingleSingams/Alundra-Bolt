@@ -60,11 +60,10 @@ export class LoadingScene extends Phaser.Scene {
       repeat: 0,
     });
 
-    // Elder NPC — slow idle cycle through first 3 standing poses
     this.anims.create({
       key: 'elder-idle',
-      frames: this.anims.generateFrameNumbers('npc-elder', { start: 0, end: 2 }),
-      frameRate: 3,
+      frames: [{ key: 'npc-elder', frame: 0 }],
+      frameRate: 1,
       repeat: -1,
     });
 

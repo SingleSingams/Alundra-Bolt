@@ -39,6 +39,7 @@ export const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
         id: 'elara',
         name: 'Elara die Kräuterkundige',
         portrait: 'assets/portraits/innkeeper.png',
+        tint: 0x90ee90, // light green — herbalist
         x: cx - 110,
         y: cy - 60,
         lines: [
@@ -51,6 +52,7 @@ export const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
         id: 'magnus',
         name: 'Alter Magnus',
         portrait: 'assets/portraits/explorer.png',
+        tint: 0xffd700, // gold — wise elder
         x: cx + 110,
         y: cy - 60,
         lines: [
@@ -63,6 +65,7 @@ export const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
         id: 'mira',
         name: 'Mira die Dorfälteste',
         portrait: 'assets/portraits/elder-woman.png',
+        tint: 0xdda0dd, // plum — village elder
         x: cx,
         y: cy + 120,
         lines: [
@@ -96,6 +99,7 @@ export const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
         name: 'Theron der Wanderer',
         portrait: 'assets/portraits/boy-npc.png',
         portraitColumns: 4,
+        tint: 0x87ceeb, // sky blue — wanderer
         x: cx - 120,
         y: cy + 80,
         lines: [
@@ -108,6 +112,7 @@ export const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
         id: 'lina',
         name: 'Lina, verirrtes Kind',
         portrait: 'assets/portraits/peasant-girl.png',
+        tint: 0xffb6c1, // light pink — child
         x: cx + 140,
         y: cy - 100,
         lines: [
@@ -144,6 +149,7 @@ export const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
         name: 'Arwen, Gefallene Späher',
         portrait: 'assets/portraits/girl-npc.png',
         portraitColumns: 4,
+        tint: 0xffa07a, // light salmon — wounded scout
         x: cx + 80,
         y: cy - 80,
         lines: [

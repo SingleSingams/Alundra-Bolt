@@ -10,6 +10,7 @@ export interface NPCDefinition {
   y: number;
   portrait?: string;
   portraitColumns?: number;
+  tint?: number; // hex color applied to sprite, e.g. 0x90ee90 for green tint
 }
 
 export class NPC extends Phaser.GameObjects.Container {
@@ -43,6 +44,10 @@ export class NPC extends Phaser.GameObjects.Container {
     } else {
       NPC.ensureTextures(scene);
       this.sprite = scene.add.sprite(0, 0, 'npc').setScale(1);
+    }
+
+    if (def.tint !== undefined) {
+      this.sprite.setTint(def.tint);
     }
 
     this.promptGfx = scene.add.graphics();
