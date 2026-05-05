@@ -46,6 +46,7 @@ import { SaveSystem } from './SaveSystem';
 import { Boss } from './Boss';
 import { Projectile } from './Projectile';
 import { SoundSystem } from './SoundSystem';
+import { HapticSystem } from './HapticSystem';
 import { ZONE_CONFIGS, ZoneConfig, EdgeDirection } from './ZoneConfigs';
 
 const centerX = WORLD_WIDTH / 2;
@@ -92,6 +93,9 @@ export class MainScene extends Phaser.Scene {
   private exploredChunks = new Set<string>();
   private readonly CHUNK_SIZE = 4;
   private ngPlus = 0;
+  private combo = 0;
+  private comboResetTimer = 0;
+  private readonly COMBO_RESET_MS = 3000;
 
   constructor() {
     super({ key: 'MainScene' });
@@ -661,6 +665,7 @@ export class MainScene extends Phaser.Scene {
     if (this.isTransitioning) return;
     this.isTransitioning = true;
     this.player.setFrozen(true);
+    SoundSystem.playZoneTransition();
 
     this.cameras.main.fadeOut(TRANSITION_FADE_MS, 0, 0, 0);
     this.cameras.main.once('camerafadeoutcomplete', () => {
@@ -716,10 +721,12 @@ export class MainScene extends Phaser.Scene {
         enemy.takeDamage(this.currentAttackDamage, (ex, ey) => this.onEnemyDeath(ex, ey, eid));
 
         SoundSystem.playEnemyHit();
+        HapticSystem.hit();
         this.cameras.main.shake(120, 0.004);
         this.spawnParticleBurst(enemy.x, enemy.y, 0xef4444, 7, 50, 320);
         this.showDamageNumber(enemy.x, enemy.y - 10, this.currentAttackDamage, false);
         this.triggerFreezeFrame(50);
+        this.incrementCombo();
       },
       undefined,
       this
@@ -736,8 +743,10 @@ export class MainScene extends Phaser.Scene {
         proj.hit();
         const eid2 = enemy.name;
         enemy.takeDamage(this.currentProjectileDamage, (ex, ey) => this.onEnemyDeath(ex, ey, eid2));
+        SoundSystem.playProjectileHit();
         this.spawnParticleBurst(enemy.x, enemy.y, 0xfbbf24, 5, 40, 280);
         this.showDamageNumber(enemy.x, enemy.y - 10, this.currentProjectileDamage, false);
+        this.incrementCombo();
       },
       undefined,
       this
@@ -767,18 +776,35 @@ export class MainScene extends Phaser.Scene {
     }
     this.gainXp(XP_PER_ENEMY);
     SoundSystem.playEnemyDeath();
+    HapticSystem.death();
     this.spawnParticleBurst(x, y, 0xef4444, 12, 70, 500);
     this.spawnParticleBurst(x, y, 0xfbbf24, 6, 45, 400);
     this.flashScreen();
+  }
+
+  private incrementCombo(): void {
+    this.combo++;
+    this.comboResetTimer = this.COMBO_RESET_MS;
+    this.game.events.emit(GAME_EVENTS.COMBO_CHANGE, this.combo);
+  }
+
+  private resetCombo(): void {
+    if (this.combo === 0) return;
+    this.combo = 0;
+    this.comboResetTimer = 0;
+    this.game.events.emit(GAME_EVENTS.COMBO_CHANGE, 0);
   }
 
   // ─── Player damaged handler ───────────────────────────────────────────────
 
   private onPlayerDamaged(pos: { x: number; y: number }): void {
     SoundSystem.playPlayerDamage();
+    HapticSystem.hit();
+    this.resetCombo();
     this.spawnParticleBurst(pos.x, pos.y, 0xffffff, 8, 55, 350);
     this.spawnParticleBurst(pos.x, pos.y, 0xfde68a, 5, 35, 280);
     this.showDamageNumber(pos.x, pos.y - 10, 2, false);
+    if (this.player.getHp() <= 1) HapticSystem.danger();
     if (this.player.getHp() > 0) {
       this.saveCurrentState();
     }
@@ -931,6 +957,7 @@ export class MainScene extends Phaser.Scene {
   private onLevelUp(): void {
     this.player.setHp(MAX_HP);
     SoundSystem.playLevelUp();
+    HapticSystem.levelUp();
     this.game.events.emit(GAME_EVENTS.LEVEL_UP, this.level);
     this.game.events.emit(GAME_EVENTS.XP_CHANGE, {
       xp: this.xp, level: this.level, nextLevelXp: XP_THRESHOLDS[this.level - 1] ?? null,
@@ -1008,7 +1035,7 @@ export class MainScene extends Phaser.Scene {
           item.collect(() => {
             if (isPotion) {
               // Potions are stored in inventory; use them manually via E / tap
-              SoundSystem.playHeal();
+              SoundSystem.playPickup();
               this.addToInventory('potion');
               this.spawnParticleBurst(ix, iy, 0x4ade80, 6, 36, 350);
             } else {
@@ -1129,6 +1156,13 @@ export class MainScene extends Phaser.Scene {
 
   update(_time: number, delta: number): void {
     if (this.hazardCooldown > 0) this.hazardCooldown = Math.max(0, this.hazardCooldown - delta);
+
+    // Combo reset timer
+    if (this.combo > 0 && this.comboResetTimer > 0) {
+      this.comboResetTimer -= delta;
+      if (this.comboResetTimer <= 0) this.resetCombo();
+    }
+
     this.player.update(delta);
     this.player.setDepth(this.player.y + 1);
 

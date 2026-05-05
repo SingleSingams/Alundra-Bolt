@@ -70,6 +70,7 @@ export const GAME_EVENTS = {
   LEVEL_UP_CHOICE: 'level-up-choice',
   LEVEL_UP_CHOSEN: 'level-up-chosen',
   VICTORY: 'victory',
+  COMBO_CHANGE: 'combo-change',
 } as const;
 
 export const NG_PLUS_HP_MULT = 1.5;

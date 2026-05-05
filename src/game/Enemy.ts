@@ -24,6 +24,7 @@ export class Enemy extends Phaser.GameObjects.Container {
   private readonly patrolAxis: PatrolAxis;
   readonly enemyType: EnemyType;
   private patrolDir = 1;
+  private readonly flankAngleOffset: number;
   private alertVisible = false;
   private hp: number;
   private maxHp: number;
@@ -41,6 +42,7 @@ export class Enemy extends Phaser.GameObjects.Container {
     this.patrolCenter = new Phaser.Math.Vector2(x, y);
     this.patrolAxis = patrolAxis;
     this.enemyType = type;
+    this.flankAngleOffset = (Math.random() - 0.5) * 0.9;
     const idx = Math.min(level - 1, ENEMY_HP_SCALE.length - 1);
     this.maxHp = Math.round(ENEMY_MAX_HP * ENEMY_HP_SCALE[idx] * hpMult);
     this.hp = this.maxHp;
@@ -279,9 +281,30 @@ export class Enemy extends Phaser.GameObjects.Container {
     const dx = player.x - this.x;
     const dy = player.y - this.y;
     const len = Math.sqrt(dx * dx + dy * dy);
-    if (len > 1) {
-      body.setVelocity((dx / len) * this.chaseSpeed, (dy / len) * this.chaseSpeed);
+    if (len <= 1) return;
+
+    if (this.enemyType === 'ranger') {
+      // Rangers maintain optimal firing distance
+      if (len < RANGER_STOP_RANGE - 20) {
+        // Too close: back away
+        body.setVelocity(-(dx / len) * this.chaseSpeed * 0.75, -(dy / len) * this.chaseSpeed * 0.75);
+      } else if (len <= RANGER_STOP_RANGE + 50) {
+        // In optimal range: strafe slightly
+        body.setVelocity(-(dy / len) * 28, (dx / len) * 28);
+      } else {
+        // Too far: close in
+        body.setVelocity((dx / len) * this.chaseSpeed, (dy / len) * this.chaseSpeed);
+      }
+      return;
     }
+
+    // Basic / shielder / speedrunner: approach with per-enemy angle offset (flanking spread)
+    const rawAngle = Math.atan2(dy, dx);
+    const adjustedAngle = rawAngle + this.flankAngleOffset;
+    body.setVelocity(
+      Math.cos(adjustedAngle) * this.chaseSpeed,
+      Math.sin(adjustedAngle) * this.chaseSpeed
+    );
   }
 
   private showAlert(): void {

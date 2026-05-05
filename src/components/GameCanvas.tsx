@@ -45,6 +45,7 @@ export function GameCanvas() {
   const [skillChoice, setSkillChoice] = useState<{ level: number; skills: LevelUpSkill[] } | null>(null);
   const [paused, setPaused] = useState(false);
   const [victory, setVictory] = useState<{ ngPlus: number } | null>(null);
+  const [combo, setCombo] = useState(0);
   const [settings, setSettings] = useState<Settings>(() => SettingsSystem.load());
   const [loadProgress, setLoadProgress] = useState(0);
   const [loaded, setLoaded] = useState(false);
@@ -80,6 +81,7 @@ export function GameCanvas() {
   }, []);
   const handleGameOver = useCallback(() => setGameOver(true), []);
   const handleVictory = useCallback((data: { ngPlus: number }) => setVictory(data), []);
+  const handleComboChange = useCallback((c: number) => setCombo(c), []);
   const handleXpChange = useCallback(
     (data: { xp: number; level: number; nextLevelXp: number | null }) => {
       setXp(data.xp);
@@ -156,6 +158,7 @@ export function GameCanvas() {
     game.events.on(GAME_EVENTS.BOSS_HP, handleBossHp);
     game.events.on(GAME_EVENTS.LEVEL_UP_CHOICE, handleLevelUpChoice);
     game.events.on(GAME_EVENTS.VICTORY, handleVictory);
+    game.events.on(GAME_EVENTS.COMBO_CHANGE, handleComboChange);
 
     return () => {
       game.events.off(GAME_EVENTS.HP_CHANGE, handleHpChange);
@@ -175,6 +178,7 @@ export function GameCanvas() {
       game.events.off(GAME_EVENTS.BOSS_HP, handleBossHp);
       game.events.off(GAME_EVENTS.LEVEL_UP_CHOICE, handleLevelUpChoice);
       game.events.off(GAME_EVENTS.VICTORY, handleVictory);
+      game.events.off(GAME_EVENTS.COMBO_CHANGE, handleComboChange);
       game.destroy(true);
       gameRef.current = null;
     };
@@ -196,6 +200,7 @@ export function GameCanvas() {
     handleBossHp,
     handleLevelUpChoice,
     handleVictory,
+    handleComboChange,
     gameStarted,
   ]);
 
@@ -256,6 +261,7 @@ export function GameCanvas() {
         showTouchControls={settings.showTouchControls}
         shieldCharges={shieldCharges}
         bossHp={bossHp}
+        combo={combo}
         onUsePotion={handleUsePotion}
       />
       {settings.showTouchControls && <TouchControls />}

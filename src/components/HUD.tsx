@@ -479,10 +479,11 @@ interface HUDProps {
   showTouchControls?: boolean;
   shieldCharges: number;
   bossHp: { hp: number; maxHp: number; phase: number } | null;
+  combo?: number;
   onUsePotion?: () => void;
 }
 
-export function HUD({ hp, maxHp, isJumping, inventory, zone, xp, level, nextLevelXp, minimapData, showHints, showTouchControls, shieldCharges, bossHp, onUsePotion }: HUDProps) {
+export function HUD({ hp, maxHp, isJumping, inventory, zone, xp, level, nextLevelXp, minimapData, showHints, showTouchControls, shieldCharges, bossHp, combo, onUsePotion }: HUDProps) {
   const fullHearts = Math.floor(hp / 2);
   const hasHalf = hp % 2 === 1;
   const totalSlots = Math.ceil(maxHp / 2);
@@ -561,6 +562,32 @@ export function HUD({ hp, maxHp, isJumping, inventory, zone, xp, level, nextLeve
 
       {bossHp && bossHp.hp > 0 && (
         <BossHpBar hp={bossHp.hp} maxHp={bossHp.maxHp} phase={bossHp.phase} />
+      )}
+
+      {combo !== undefined && combo >= 3 && (
+        <div
+          key={combo}
+          className="absolute top-1/4 right-4 pointer-events-none select-none animate-in zoom-in fade-in duration-200"
+        >
+          <div className={cn(
+            'rounded-xl px-3 py-1.5 shadow-2xl border text-right',
+            combo >= 10
+              ? 'bg-red-900/85 border-red-400/60 shadow-red-900/50'
+              : combo >= 5
+              ? 'bg-orange-900/85 border-orange-400/60 shadow-orange-900/50'
+              : 'bg-amber-900/80 border-amber-500/60'
+          )}>
+            <div className={cn(
+              'font-extrabold font-mono leading-none tabular-nums',
+              combo >= 10 ? 'text-red-300 text-2xl' : combo >= 5 ? 'text-orange-300 text-xl' : 'text-amber-300 text-lg'
+            )}>
+              {combo}×
+            </div>
+            <div className="text-[9px] tracking-widest uppercase font-bold text-stone-400 mt-0.5">
+              Combo
+            </div>
+          </div>
+        </div>
       )}
 
       {isJumping && (

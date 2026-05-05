@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { Card } from './ui/card';
 import { cn } from '../lib/utils';
 import { MessageSquare, ChevronRight } from 'lucide-react';
@@ -12,13 +12,59 @@ interface DialogBoxProps {
 
 export function DialogBox({ isOpen, npcName, lines, onClose }: DialogBoxProps) {
   const [pageIndex, setPageIndex] = useState(0);
+  const [displayed, setDisplayed] = useState('');
+  const typeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isTypingRef = useRef(false);
 
   useEffect(() => {
     if (isOpen) setPageIndex(0);
   }, [isOpen, npcName]);
 
+  const currentLine = lines[pageIndex] ?? '';
+
+  // Typewriter effect
+  useEffect(() => {
+    if (typeIntervalRef.current) {
+      clearInterval(typeIntervalRef.current);
+      typeIntervalRef.current = null;
+    }
+    if (!isOpen) { setDisplayed(''); return; }
+
+    setDisplayed('');
+    isTypingRef.current = true;
+    let i = 0;
+
+    typeIntervalRef.current = setInterval(() => {
+      i++;
+      setDisplayed(currentLine.slice(0, i));
+      if (i >= currentLine.length) {
+        clearInterval(typeIntervalRef.current!);
+        typeIntervalRef.current = null;
+        isTypingRef.current = false;
+      }
+    }, 26);
+
+    return () => {
+      if (typeIntervalRef.current) {
+        clearInterval(typeIntervalRef.current);
+        typeIntervalRef.current = null;
+      }
+      isTypingRef.current = false;
+    };
+  }, [isOpen, currentLine]);
+
   const advance = useCallback(() => {
     if (!isOpen) return;
+    // Skip typewriter if still animating
+    if (isTypingRef.current) {
+      if (typeIntervalRef.current) {
+        clearInterval(typeIntervalRef.current);
+        typeIntervalRef.current = null;
+      }
+      isTypingRef.current = false;
+      setDisplayed(lines[pageIndex] ?? '');
+      return;
+    }
     setPageIndex((prev) => {
       if (prev + 1 >= lines.length) {
         onClose();
@@ -26,7 +72,7 @@ export function DialogBox({ isOpen, npcName, lines, onClose }: DialogBoxProps) {
       }
       return prev + 1;
     });
-  }, [isOpen, lines.length, onClose]);
+  }, [isOpen, lines, pageIndex, onClose]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -45,8 +91,8 @@ export function DialogBox({ isOpen, npcName, lines, onClose }: DialogBoxProps) {
 
   if (!isOpen) return null;
 
-  const currentLine = lines[pageIndex] ?? '';
   const isLast = pageIndex === lines.length - 1;
+  const isTypingDone = displayed.length >= currentLine.length;
 
   return (
     <div className="absolute inset-0 pointer-events-none flex items-end justify-center pb-8 z-20">
@@ -82,11 +128,11 @@ export function DialogBox({ isOpen, npcName, lines, onClose }: DialogBoxProps) {
           </div>
 
           <div className="px-5 py-4 min-h-[88px]">
-            <p
-              key={pageIndex}
-              className="text-stone-100 leading-relaxed text-sm animate-in fade-in slide-in-from-left-1 duration-300"
-            >
-              {currentLine}
+            <p className="text-stone-100 leading-relaxed text-sm">
+              {displayed}
+              {!isTypingDone && (
+                <span className="inline-block w-0.5 h-4 bg-amber-300 ml-0.5 align-middle animate-pulse" />
+              )}
             </p>
           </div>
 
@@ -102,7 +148,7 @@ export function DialogBox({ isOpen, npcName, lines, onClose }: DialogBoxProps) {
               <kbd className="px-1 py-0.5 text-[9px] font-mono bg-stone-800 rounded border border-stone-600 leading-none">
                 Z
               </kbd>
-              <span>{isLast ? 'Schließen' : 'Weiter'}</span>
+              <span>{!isTypingDone ? 'Überspringen' : isLast ? 'Schließen' : 'Weiter'}</span>
               <ChevronRight className="w-3 h-3" />
             </button>
           </div>

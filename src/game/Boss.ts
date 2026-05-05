@@ -1,5 +1,5 @@
 import * as Phaser from 'phaser';
-import { GAME_EVENTS } from './constants';
+import { GAME_EVENTS, WORLD_WIDTH, WORLD_HEIGHT } from './constants';
 
 export const BOSS_MAX_HP = 20;
 const BOSS_SPEED_P1 = 58;
@@ -22,7 +22,12 @@ export class Boss extends Phaser.GameObjects.Container {
   private speed = BOSS_SPEED_P1;
   private phaseTriggered = false;
   private shootCooldown = 0;
-  private readonly SHOOT_INTERVAL = 2200;
+  private readonly SHOOT_INTERVAL = 1800;
+  private isTeleporting = false;
+  private teleportTimer = 0;
+  private readonly TELEPORT_INTERVAL = 7000;
+  private lastPlayerX = 0;
+  private lastPlayerY = 0;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     super(scene, x, y);
@@ -135,27 +140,72 @@ export class Boss extends Phaser.GameObjects.Container {
 
   update(playerX: number, playerY: number, delta: number): void {
     if (this.dying) return;
+    this.lastPlayerX = playerX;
+    this.lastPlayerY = playerY;
+
     if (this.invulnTimer > 0) {
       this.invulnTimer = Math.max(0, this.invulnTimer - delta);
     }
 
-    const body = this.body as Phaser.Physics.Arcade.Body;
-    const dx = playerX - this.x;
-    const dy = playerY - this.y;
-    const len = Math.sqrt(dx * dx + dy * dy);
-    if (len > 1) {
-      body.setVelocity((dx / len) * this.speed, (dy / len) * this.speed);
+    if (!this.isTeleporting) {
+      const body = this.body as Phaser.Physics.Arcade.Body;
+      const dx = playerX - this.x;
+      const dy = playerY - this.y;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      if (len > 1) {
+        body.setVelocity((dx / len) * this.speed, (dy / len) * this.speed);
+      }
     }
 
     if (this.phase === 2) {
       this.shootCooldown = Math.max(0, this.shootCooldown - delta);
+      if (!this.isTeleporting) {
+        this.teleportTimer = Math.max(0, this.teleportTimer - delta);
+        if (this.teleportTimer <= 0) {
+          this.teleportTimer = this.TELEPORT_INTERVAL;
+          this.doTeleport();
+        }
+      }
     }
 
     this.setDepth(this.y + 1);
   }
 
+  private doTeleport(): void {
+    this.isTeleporting = true;
+    this.setVisible(false);
+    (this.body as Phaser.Physics.Arcade.Body).setVelocity(0, 0);
+
+    this.scene.time.delayedCall(420, () => {
+      if (!this.active || this.dying) { this.isTeleporting = false; return; }
+
+      // Appear on opposite side of player from current boss position
+      const angleFromPlayerToBoss = Math.atan2(this.y - this.lastPlayerY, this.x - this.lastPlayerX);
+      const teleportAngle = angleFromPlayerToBoss + Math.PI;
+      const newX = Phaser.Math.Clamp(
+        this.lastPlayerX + Math.cos(teleportAngle) * 72,
+        60, WORLD_WIDTH - 60
+      );
+      const newY = Phaser.Math.Clamp(
+        this.lastPlayerY + Math.sin(teleportAngle) * 72,
+        60, WORLD_HEIGHT - 60
+      );
+
+      this.setPosition(newX, newY);
+      (this.body as Phaser.Physics.Arcade.Body).reset(newX, newY);
+      this.setVisible(true);
+      // Flash purple on appearance
+      this.sprite.setTint(0xff00ff);
+      this.scene.time.delayedCall(120, () => {
+        if (this.active && !this.dying) this.sprite.clearTint();
+      });
+      this.isTeleporting = false;
+      this.shootCooldown = 0; // fire immediately after teleport
+    });
+  }
+
   wantsShoot(): boolean {
-    return this.phase === 2 && !this.dying && this.shootCooldown <= 0;
+    return this.phase === 2 && !this.dying && !this.isTeleporting && this.shootCooldown <= 0;
   }
 
   markShot(): void {
@@ -187,7 +237,7 @@ export class Boss extends Phaser.GameObjects.Container {
       this.sprite.clearTint();
     });
 
-    if (!this.phaseTriggered && this.hp <= BOSS_MAX_HP / 2) {
+    if (!this.phaseTriggered && this.hp <= Math.floor(BOSS_MAX_HP * 0.4)) {
       this.phaseTriggered = true;
       this.enterPhase2();
     }
@@ -205,6 +255,7 @@ export class Boss extends Phaser.GameObjects.Container {
     this.sprite.setTexture('boss-p2');
     this.nameLabel.setColor('#e879f9');
     this.drawHpBar();
+    this.teleportTimer = this.TELEPORT_INTERVAL;
     this.scene.game.events.emit('boss-phase-2', { x: this.x, y: this.y });
   }
 

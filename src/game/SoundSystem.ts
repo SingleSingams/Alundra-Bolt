@@ -242,6 +242,23 @@ class SoundSystemClass {
     });
     this.tone(55, 'square', 0.8, 0.3, 0.001, 0.1);
   }
+
+  playPickup(): void {
+    this.tone(880, 'sine', 0.05, 0.18, 0.001);
+    this.tone(1320, 'sine', 0.07, 0.14, 0.001, 0.04);
+    this.tone(1760, 'sine', 0.06, 0.10, 0.001, 0.09);
+  }
+
+  playZoneTransition(): void {
+    this.tone(220, 'sine', 0.18, 0.22, 0.001);
+    this.tone(330, 'sine', 0.22, 0.16, 0.001, 0.06);
+    this.tone(440, 'sine', 0.28, 0.12, 0.001, 0.14);
+  }
+
+  playProjectileHit(): void {
+    this.tone(540, 'square', 0.04, 0.20, 0.001);
+    this.tone(360, 'sawtooth', 0.06, 0.14, 0.001, 0.02);
+  }
 }
 
 export const SoundSystem = new SoundSystemClass();
