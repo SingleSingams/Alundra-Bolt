@@ -41,9 +41,11 @@ const DIRECTION_ANGLES: Record<FacingDirection, number> = {
   s: 90, sw: 135, w: 180, nw: -135,
 };
 
+const KNIGHT_SCALE = 0.19; // 256px frame → ~48px visual
+
 export class Player extends Phaser.GameObjects.Container {
   private shadow: Phaser.GameObjects.Image;
-  private sprite: Phaser.GameObjects.Image;
+  private sprite: Phaser.GameObjects.Sprite;
   private directionIndicator: Phaser.GameObjects.Graphics;
   private dustParticles: Phaser.GameObjects.Graphics;
   private slashGfx: Phaser.GameObjects.Graphics;
@@ -80,8 +82,9 @@ export class Player extends Phaser.GameObjects.Container {
   constructor(scene: Phaser.Scene, x: number, y: number) {
     super(scene, x, y);
 
-    this.shadow = scene.add.image(0, 10, 'shadow').setAlpha(0.55);
-    this.sprite = scene.add.image(0, 0, 'player');
+    this.shadow = scene.add.image(0, 14, 'shadow').setAlpha(0.55).setScale(1.6, 0.5);
+    this.sprite = scene.add.sprite(0, 0, 'knight', 0).setScale(KNIGHT_SCALE);
+    this.sprite.play('knight-idle');
     this.directionIndicator = scene.add.graphics();
     this.dustParticles = scene.add.graphics();
     this.slashGfx = scene.add.graphics();
@@ -172,7 +175,27 @@ export class Player extends Phaser.GameObjects.Container {
     this.updateInvincibility(delta);
     this.updateBob(delta);
     this.updateAttackZonePosition();
+    this.updateAnimation();
     VirtualInput.endFrame();
+  }
+
+  private updateAnimation(): void {
+    // Flip horizontally based on horizontal facing
+    const goingLeft = this.lastDirection === 'w' || this.lastDirection === 'nw' || this.lastDirection === 'sw';
+    const goingRight = this.lastDirection === 'e' || this.lastDirection === 'ne' || this.lastDirection === 'se';
+    if (goingLeft) this.sprite.setFlipX(true);
+    else if (goingRight) this.sprite.setFlipX(false);
+
+    if (this.isAttacking) return; // attack anim plays itself out
+
+    const moving = this.facing !== 'idle';
+    const currentAnim = this.sprite.anims?.currentAnim?.key;
+
+    if (moving && currentAnim !== 'knight-walk') {
+      this.sprite.play('knight-walk');
+    } else if (!moving && currentAnim !== 'knight-idle') {
+      this.sprite.play('knight-idle');
+    }
   }
 
   private handleMovement(): void {
@@ -250,16 +273,19 @@ export class Player extends Phaser.GameObjects.Container {
     this.spawnGhostTrail();
 
     this.scene.tweens.killTweensOf(this.sprite);
+    this.sprite.play('knight-attack');
+    this.sprite.once('animationcomplete', () => {
+      if (!this.isAttacking) return;
+      this.sprite.play('knight-idle');
+    });
     this.scene.tweens.add({
       targets: this.sprite,
-      scaleX: 1.5,
-      scaleY: 0.85,
+      scaleX: KNIGHT_SCALE * 1.4,
+      scaleY: KNIGHT_SCALE * 0.88,
       duration: 80,
       yoyo: true,
       ease: 'Sine.easeOut',
-      onComplete: () => {
-        this.sprite.setScale(1);
-      },
+      onComplete: () => { this.sprite.setScale(KNIGHT_SCALE); },
     });
 
     this.scene.game.events.emit(GAME_EVENTS.PLAYER_ATTACK, this.lastDirection);
@@ -269,7 +295,9 @@ export class Player extends Phaser.GameObjects.Container {
     for (let i = 0; i < 3; i++) {
       this.scene.time.delayedCall(i * 18, () => {
         if (!this.active) return;
-        const ghost = this.scene.add.image(this.x, this.y + this.jumpOffset, 'player');
+        const ghost = this.scene.add.sprite(this.x, this.y + this.jumpOffset, 'knight', this.sprite.frame.name as unknown as number);
+        ghost.setScale(KNIGHT_SCALE);
+        ghost.setFlipX(this.sprite.flipX);
         ghost.setAlpha(0.45 - i * 0.12);
         ghost.setTint(0x93c5fd);
         ghost.setDepth(this.depth - 0.1);
@@ -288,7 +316,8 @@ export class Player extends Phaser.GameObjects.Container {
     const body = this.attackZone.body as Phaser.Physics.Arcade.Body;
     body.enable = false;
     this.slashGfx.clear();
-    this.sprite.setScale(1);
+    this.sprite.setScale(KNIGHT_SCALE);
+    this.sprite.play('knight-idle');
   }
 
   private updateAttackZonePosition(): void {
@@ -341,17 +370,18 @@ export class Player extends Phaser.GameObjects.Container {
       onYoyo: () => {
         this.scene.tweens.add({
           targets: this.sprite,
-          scaleX: JUMP_SCALE_PEAK,
-          scaleY: JUMP_SCALE_PEAK,
+          scaleX: KNIGHT_SCALE * JUMP_SCALE_PEAK,
+          scaleY: KNIGHT_SCALE * JUMP_SCALE_PEAK,
           duration: JUMP_DURATION * 0.2,
           yoyo: true,
           ease: 'Sine.easeOut',
+          onComplete: () => { this.sprite.setScale(KNIGHT_SCALE); },
         });
       },
       onComplete: () => {
         this.isJumping = false;
         this.jumpOffset = 0;
-        this.sprite.setScale(1);
+        this.sprite.setScale(KNIGHT_SCALE);
         this.scene.game.events.emit(GAME_EVENTS.PLAYER_LAND);
         this.spawnLandDust();
       },
@@ -491,7 +521,8 @@ export class Player extends Phaser.GameObjects.Container {
         const zoneBody = this.attackZone.body as Phaser.Physics.Arcade.Body;
         zoneBody.enable = false;
         this.slashGfx.clear();
-        this.sprite.setScale(1);
+        this.sprite.setScale(KNIGHT_SCALE);
+        this.sprite.play('knight-idle');
       }
     }
   }

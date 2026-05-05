@@ -2,7 +2,6 @@ import * as Phaser from 'phaser';
 import { GAME_EVENTS } from './constants';
 import {
   createGrassTileset,
-  createPlayerTexture,
   createShadowTexture,
   createHeartTexture,
 } from './TextureFactory';
@@ -15,13 +14,51 @@ export class LoadingScene extends Phaser.Scene {
     super({ key: 'LoadingScene' });
   }
 
+  preload(): void {
+    this.load.spritesheet('knight', 'assets/knight.png', {
+      frameWidth: 256,
+      frameHeight: 256,
+    });
+  }
+
   create(): void {
     this.progress(0);
+
+    // Knight animations (global, available to all sprites)
+    this.anims.create({
+      key: 'knight-idle',
+      frames: [{ key: 'knight', frame: 0 }],
+      frameRate: 4,
+      repeat: -1,
+    });
+    this.anims.create({
+      key: 'knight-walk',
+      frames: this.anims.generateFrameNumbers('knight', { start: 0, end: 3 }),
+      frameRate: 8,
+      repeat: -1,
+    });
+    this.anims.create({
+      key: 'knight-attack',
+      frames: this.anims.generateFrameNumbers('knight', { start: 4, end: 7 }),
+      frameRate: 16,
+      repeat: 0,
+    });
+    this.anims.create({
+      key: 'knight-hurt',
+      frames: this.anims.generateFrameNumbers('knight', { start: 8, end: 9 }),
+      frameRate: 10,
+      repeat: 0,
+    });
+    this.anims.create({
+      key: 'knight-death',
+      frames: this.anims.generateFrameNumbers('knight', { start: 12, end: 13 }),
+      frameRate: 5,
+      repeat: 0,
+    });
 
     createGrassTileset(this);
     this.progress(0.2);
 
-    createPlayerTexture(this);
     createShadowTexture(this);
     createHeartTexture(this);
     this.progress(0.5);

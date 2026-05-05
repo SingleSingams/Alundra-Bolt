@@ -5,7 +5,6 @@ import { Item, WorldItemType } from './Item';
 import { NPC, NPCDefinition } from './NPC';
 import {
   createGrassTileset,
-  createPlayerTexture,
   createShadowTexture,
   createHeartTexture,
   createObstacleTextures,
@@ -115,7 +114,6 @@ export class MainScene extends Phaser.Scene {
 
   preload(): void {
     createGrassTileset(this);
-    createPlayerTexture(this);
     createShadowTexture(this);
     createHeartTexture(this);
     Projectile.ensureTexture(this);
