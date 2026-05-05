@@ -327,6 +327,64 @@ export class MainScene extends Phaser.Scene {
     this.treeGroup.add(canopy);
   }
 
+  // ─── Village (grasslands only) ────────────────────────────────────────────
+
+  private placeVillage(): void {
+    if (!this.textures.exists('building-tavern')) return; // assets not loaded yet
+
+    // Ensure tiny blocker texture exists
+    if (!this.textures.exists('_blocker')) {
+      const g = this.add.graphics();
+      g.fillStyle(0xffffff, 0); g.fillRect(0, 0, 2, 2);
+      g.generateTexture('_blocker', 2, 2); g.destroy();
+    }
+
+    // Each entry: [textureKey, offsetX, offsetY, scale, blockerW, blockerH, blockerOffY]
+    const layout: [string, number, number, number, number, number, number][] = [
+      ['building-tavern',     -110, -145, 0.22,  64, 24, 30],
+      ['building-farm',        160, -155, 0.20,  80, 22, 28],
+      ['building-apothecary', -195,   20, 0.21,  72, 22, 26],
+      ['building-market',      155,   30, 0.21,  72, 20, 24],
+      ['building-blacksmith', -200,  165, 0.21,  68, 22, 26],
+      ['building-windmill',      0,  220, 0.22,  52, 22, 30],
+      ['building-watchtower',  205, -215, 0.22,  44, 22, 28],
+    ];
+
+    for (const [key, ox, oy, scale, bw, bh, bOffY] of layout) {
+      if (!this.textures.exists(key)) continue;
+      const x = centerX + ox;
+      const y = centerY + oy;
+
+      // Shadow ellipse under building
+      const frame = this.textures.getFrame(key);
+      const vw = frame.realWidth * scale;
+      const vh = frame.realHeight * scale;
+      const shadow = this.add.ellipse(x, y + vh * 0.48, vw * 0.75, 14, 0x000000, 0.22);
+      shadow.setDepth(y - 1);
+      this.decorGroup.add(shadow);
+
+      // Visual building image
+      const img = this.add.image(x, y, key).setScale(scale);
+      img.setDepth(y + vh * 0.3);
+      this.decorGroup.add(img);
+
+      // Physics blocker at building base (keeps player/NPCs from walking through)
+      const blocker = this.obstacles.create(x, y + bOffY, '_blocker') as Phaser.Physics.Arcade.Image;
+      (blocker.body as Phaser.Physics.Arcade.StaticBody).setSize(bw, bh);
+      blocker.setVisible(false).setAlpha(0);
+      blocker.refreshBody();
+    }
+
+    // Dirt path connecting buildings — drawn under everything
+    const pathGfx = this.add.graphics();
+    pathGfx.fillStyle(0xb8a070, 0.35);
+    // Horizontal main street
+    pathGfx.fillRoundedRect(centerX - 230, centerY - 20, 460, 38, 8);
+    // Vertical lane
+    pathGfx.fillRoundedRect(centerX - 20, centerY - 240, 38, 320, 8);
+    pathGfx.setDepth(0.05);
+  }
+
   // ─── Decorations (non-blocking world dressing) ────────────────────────────
 
   private placeDecorations(zone: ZoneId, protectedTiles: Set<string>): void {
@@ -462,6 +520,7 @@ export class MainScene extends Phaser.Scene {
     this.placeTrees(config.numTrees);
     this.placeObstacles(config.obstacleDensity, protectedTiles);
     this.placeDecorations(this.currentZone, protectedTiles);
+    if (this.currentZone === 'grasslands') this.placeVillage();
     this.spawnEnemies(config.enemySpawns);
     this.spawnInitialItems(config.heartSpawns);
     if (config.hazardSpawns) this.spawnHazards(config.hazardSpawns);

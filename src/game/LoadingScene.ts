@@ -49,6 +49,15 @@ export class LoadingScene extends Phaser.Scene {
       });
     }
 
+    // Village buildings
+    const buildings = [
+      'building-farm', 'building-tavern', 'building-apothecary', 'building-market',
+      'building-blacksmith', 'building-windmill', 'building-watchtower', 'building-manor',
+    ];
+    for (const key of buildings) {
+      this.load.image(key, `assets/${key}.png`);
+    }
+
     // World decorations (individual RGBA images)
     const decors = [
       'decor-tree', 'decor-rock', 'decor-log', 'decor-stump',

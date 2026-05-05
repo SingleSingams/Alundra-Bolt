@@ -22,30 +22,22 @@ const cy = WORLD_HEIGHT / 2;
 
 export const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
   grasslands: {
-    numTrees: 40,
-    obstacleDensity: 0.1,
-    enemySpawns: [
-      { tx: 14, ty: 14, axis: 'x' },
-      { tx: 46, ty: 14, axis: 'y' },
-      { tx: 14, ty: 46, axis: 'y' },
-      { tx: 46, ty: 46, axis: 'x' },
-    ],
-    heartSpawns: [
-      { tx: 22, ty: 40 },
-      { tx: 38, ty: 40 },
-    ],
+    numTrees: 16,       // fewer trees — buildings fill the space
+    obstacleDensity: 0, // no random rocks — village roads should be clear
+    enemySpawns: [],    // peaceful village, no monsters
+    heartSpawns: [],
     npcs: [
       {
         id: 'elara',
         name: 'Elara die Kräuterkundige',
         spriteKey: 'npc-innkeeper-woman',
         portrait: 'assets/portraits/innkeeper.png',
-        x: cx - 110,
-        y: cy - 60,
+        x: cx - 155,
+        y: cy + 20,
         lines: [
-          'Willkommen im Grasland, Wanderer. Diese Felder sind seit vielen Jahreszeiten meine Heimat.',
-          'Hüte dich vor den Schatten im Wald im Osten — Kreaturen, die seit Ewigkeiten nicht mehr gesehen wurden.',
-          'Pass auf dich auf, und möge das alte Licht deinen Weg führen.',
+          'Willkommen in Aelindra, Reisender! Ich führe die Apotheke hier drüben.',
+          'Meine Kräuter heilen viele Wunden — aber gegen das Böse im Osten helfen nur Mut und ein gutes Schwert.',
+          'Sprich mit Mira auf dem Dorfplatz. Sie weiß mehr als wir alle zusammen.',
         ],
       },
       {
@@ -53,12 +45,12 @@ export const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
         name: 'Alter Magnus',
         spriteKey: 'npc-old-explorer',
         portrait: 'assets/portraits/explorer.png',
-        x: cx + 110,
-        y: cy - 60,
+        x: cx - 100,
+        y: cy - 120,
         lines: [
-          'Hm. Schon wieder eine junge Seele auf dem Weg ins Verderben.',
-          'Hinter dem Wald liegt der Verlies-Eingang — wer hineinging, kam nicht heil zurück.',
-          'Wenn du unbedingt willst: Werde stark. Besiege Bestien. Öffne Truhen. Nur so hast du eine Chance.',
+          'Ah, ein Fremder. Die Taverne ist geöffnet, falls du rasten willst.',
+          'Aber wenn du weiterreist — der Wald im Osten ist verflucht. Das sage ich aus Erfahrung.',
+          'Werde stark. Besiege Bestien. Öffne Truhen. Nur so hast du eine Chance gegen das, was in der Tiefe wartet.',
         ],
       },
       {
@@ -66,12 +58,39 @@ export const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
         name: 'Mira die Dorfälteste',
         spriteKey: 'npc-elder-woman',
         portrait: 'assets/portraits/elder-woman.png',
-        x: cx,
-        y: cy + 120,
+        x: cx + 20,
+        y: cy + 10,
         lines: [
-          'Ach, Reisender. Ich habe viele kommen und gehen sehen. Wenige kehrten aus dem Verlies zurück.',
-          'Im Wald gibt es eine geheime Passage — suche nach einer Wand, die sich anders anfühlt.',
-          'Nimm dir Zeit. Eile bringt nur den Tod.',
+          'Willkommen in Aelindra, dem letzten friedlichen Ort vor dem Dunkel.',
+          'Dieses Dorf steht seit hundert Jahren — aber die Schatten werden jeden Tag näher.',
+          'Im Wald östlich gibt es eine versteckte Wand. Dahinter liegt, was du brauchst. Such danach.',
+        ],
+      },
+      {
+        id: 'guard',
+        name: 'Dorfwächter Bram',
+        spriteKey: 'npc-young-man',
+        portrait: 'assets/portraits/boy-npc.png',
+        portraitColumns: 4,
+        x: cx + 200,
+        y: cy - 180,
+        lines: [
+          'Halt! ... Oh, kein Feind. Entschuldige, bin etwas angespannt.',
+          'Ich bewache seit Wochen den Dorfeingang. Letzte Nacht sah ich Schatten aus dem Wald kommen.',
+          'Wenn du nach Osten reist — pass auf. Und komm lebend zurück.',
+        ],
+      },
+      {
+        id: 'merchant',
+        name: 'Händler Aldric',
+        spriteKey: 'npc-old-pilgrim',
+        portrait: 'assets/portraits/explorer.png',
+        x: cx + 160,
+        y: cy + 30,
+        lines: [
+          'Guten Tag! Aldrics Markt — alles was das Abenteurer-Herz begehrt!',
+          'Leider... verkaufe ich gerade nichts. Die Lieferungen kommen nicht mehr durch den Wald.',
+          'Wenn du dort nach dem Rechten siehst, wäre ich dir sehr dankbar.',
         ],
       },
     ],
