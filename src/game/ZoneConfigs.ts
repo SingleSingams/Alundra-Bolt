@@ -38,7 +38,7 @@ export const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
       {
         id: 'elara',
         name: 'Elara die Kräuterkundige',
-        portrait: 'assets/portraits/youngster.png',
+        portrait: 'assets/portraits/innkeeper.png',
         x: cx - 110,
         y: cy - 60,
         lines: [
@@ -57,6 +57,18 @@ export const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
           'Hm. Schon wieder eine junge Seele auf dem Weg ins Verderben.',
           'Hinter dem Wald liegt der Verlies-Eingang — wer hineinging, kam nicht heil zurück.',
           'Wenn du unbedingt willst: Werde stark. Besiege Bestien. Öffne Truhen. Nur so hast du eine Chance.',
+        ],
+      },
+      {
+        id: 'mira',
+        name: 'Mira die Dorfälteste',
+        portrait: 'assets/portraits/elder-woman.png',
+        x: cx,
+        y: cy + 120,
+        lines: [
+          'Ach, Reisender. Ich habe viele kommen und gehen sehen. Wenige kehrten aus dem Verlies zurück.',
+          'Im Wald gibt es eine geheime Passage — suche nach einer Wand, die sich anders anfühlt.',
+          'Nimm dir Zeit. Eile bringt nur den Tod.',
         ],
       },
     ],
@@ -82,13 +94,26 @@ export const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
       {
         id: 'theron',
         name: 'Theron der Wanderer',
-        portrait: 'assets/portraits/explorer.png',
+        portrait: 'assets/portraits/boy-npc.png',
+        portraitColumns: 4,
         x: cx - 120,
         y: cy + 80,
         lines: [
           'Dieser Wald ist in letzter Zeit düster geworden... die Schatten regen sich mit etwas Uraltem.',
           'Ich habe Schreie jenseits der Verlies-Tore gehört. Kehr um, solange du noch kannst.',
           'Wenn du darauf bestehst — finde jedes Schwertupgrade, das du kannst. Du wirst es brauchen.',
+        ],
+      },
+      {
+        id: 'lina',
+        name: 'Lina, verirrtes Kind',
+        portrait: 'assets/portraits/peasant-girl.png',
+        x: cx + 140,
+        y: cy - 100,
+        lines: [
+          'H-hallo? Bitte erschreck mich nicht... ich habe mich hier verlaufen.',
+          'Da drüben... ich habe ein kleines Monster gesehen. Es hatte Flügel und rote Augen!',
+          'Sei vorsichtig, bitte. Ich will, dass du heil zurückkommst.',
         ],
       },
     ],
@@ -117,7 +142,8 @@ export const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
       {
         id: 'arwen',
         name: 'Arwen, Gefallene Späher',
-        portrait: 'assets/portraits/youngster.png',
+        portrait: 'assets/portraits/girl-npc.png',
+        portraitColumns: 4,
         x: cx + 80,
         y: cy - 80,
         lines: [

@@ -133,7 +133,8 @@ export const TRANSITION_EDGE_TILES = 2;
 export interface DialogPayload {
   npcName: string;
   lines: string[];
-  portrait?: string; // path relative to public/, e.g. 'assets/portraits/explorer.png'
+  portrait?: string;
+  portraitColumns?: number; // columns in the pose sheet (3 for 3×2 sheets, 4 for 4×4 sheets)
 }
 
 export const ZONE_BOB_FREQ: Record<string, number> = {

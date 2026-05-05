@@ -294,6 +294,7 @@ export function GameCanvas() {
         npcName={dialog?.npcName ?? ''}
         lines={dialog?.lines ?? []}
         portrait={dialog?.portrait}
+        portraitColumns={dialog?.portraitColumns}
         onClose={closeDialog}
       />
       <GameOverScreen isOpen={gameOver} level={level} xp={xp} zone={zone} />

@@ -1083,7 +1083,7 @@ export class MainScene extends Phaser.Scene {
 
   private openDialog(npc: NPC): void {
     this.player.setDialogActive(true);
-    const payload: DialogPayload = { npcName: npc.npcName, lines: npc.lines, portrait: npc.portrait };
+    const payload: DialogPayload = { npcName: npc.npcName, lines: npc.lines, portrait: npc.portrait, portraitColumns: npc.portraitColumns };
     this.game.events.emit(GAME_EVENTS.DIALOG_OPEN, payload);
   }
 

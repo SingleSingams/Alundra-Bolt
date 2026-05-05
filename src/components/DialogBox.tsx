@@ -8,18 +8,19 @@ interface DialogBoxProps {
   npcName: string;
   lines: string[];
   portrait?: string;
+  portraitColumns?: number;
   onClose: () => void;
 }
 
-// Portrait images are multi-pose sheets (3 cols × 2 rows).
-// background-size: 300% shows exactly 1 column (the first/idle pose).
-function Portrait({ src, name }: { src: string; name: string }) {
+// Portrait images are multi-pose sheets (cols × 2 rows).
+// background-size: <cols*100>% shows exactly 1 column (the first/idle pose).
+function Portrait({ src, name, columns = 3 }: { src: string; name: string; columns?: number }) {
   return (
     <div
       className="w-14 h-14 rounded-lg border-2 border-amber-600/60 shadow-lg flex-shrink-0 overflow-hidden"
       style={{
         backgroundImage: `url(${src})`,
-        backgroundSize: '300% auto',
+        backgroundSize: `${columns * 100}% auto`,
         backgroundPosition: '0% 0%',
         backgroundRepeat: 'no-repeat',
         imageRendering: 'auto',
@@ -29,7 +30,7 @@ function Portrait({ src, name }: { src: string; name: string }) {
   );
 }
 
-export function DialogBox({ isOpen, npcName, lines, portrait, onClose }: DialogBoxProps) {
+export function DialogBox({ isOpen, npcName, lines, portrait, portraitColumns, onClose }: DialogBoxProps) {
   const [pageIndex, setPageIndex] = useState(0);
   const [displayed, setDisplayed] = useState('');
   const typeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -117,7 +118,7 @@ export function DialogBox({ isOpen, npcName, lines, portrait, onClose }: DialogB
           {/* Header */}
           <div className="flex items-center gap-3 px-3 py-2 bg-gradient-to-r from-amber-900/40 to-stone-900/40 border-b border-amber-700/40">
             {portrait ? (
-              <Portrait src={portrait} name={npcName} />
+              <Portrait src={portrait} name={npcName} columns={portraitColumns} />
             ) : (
               <div className="w-10 h-10 rounded-full bg-blue-900/60 border border-blue-500/50 flex items-center justify-center flex-shrink-0 text-lg">
                 💬
