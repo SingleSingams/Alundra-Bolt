@@ -42,7 +42,7 @@ export function GameCanvas() {
   const [minimapData, setMinimapData] = useState<MinimapData | null>(null);
   const [shieldCharges, setShieldCharges] = useState(0);
   const [bossHp, setBossHp] = useState<{ hp: number; maxHp: number; phase: number } | null>(null);
-  const [skillChoice, setSkillChoice] = useState<{ level: number; skills: LevelUpSkill[] } | null>(null);
+  const [skillChoice, setSkillChoice] = useState<{ level: number; skills: LevelUpSkill[]; chosen: LevelUpSkill[] } | null>(null);
   const [paused, setPaused] = useState(false);
   const [victory, setVictory] = useState<{ ngPlus: number } | null>(null);
   const [combo, setCombo] = useState(0);
@@ -95,7 +95,7 @@ export function GameCanvas() {
     setTimeout(() => setLevelUpNotice(null), 2200);
   }, []);
   const handleLevelUpChoice = useCallback((data: LevelUpChoice) => {
-    setSkillChoice({ level: level, skills: data.skills });
+    setSkillChoice({ level: level, skills: data.skills, chosen: data.chosen ?? [] });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [level]);
   const handleMinimapUpdate = useCallback((data: MinimapData) => setMinimapData(data), []);
@@ -295,6 +295,7 @@ export function GameCanvas() {
         <SkillChoiceScreen
           level={skillChoice.level}
           skills={skillChoice.skills}
+          chosen={skillChoice.chosen}
           onChoose={handleSkillChosen}
         />
       )}

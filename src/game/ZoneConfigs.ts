@@ -1,6 +1,6 @@
 import { PatrolAxis, EnemyType } from './Enemy';
 import { NPCDefinition } from './NPC';
-import { ZoneId, WORLD_WIDTH, WORLD_HEIGHT } from './constants';
+import { ZoneId, InventoryItem, WORLD_WIDTH, WORLD_HEIGHT } from './constants';
 
 export type EdgeDirection = 'east' | 'west';
 export type HazardType = 'thorns' | 'lava';
@@ -14,6 +14,7 @@ export interface ZoneConfig {
   npcs: NPCDefinition[];
   transitions: Partial<Record<EdgeDirection, ZoneId>>;
   bossSpawn?: { tx: number; ty: number };
+  secretWall?: { tx: number; ty: number; reward: InventoryItem };
 }
 
 const cx = WORLD_WIDTH / 2;
@@ -58,6 +59,7 @@ export const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
       },
     ],
     transitions: { east: 'forest' },
+    secretWall: { tx: 8, ty: 38, reward: 'sword_upgrade' },
   },
   forest: {
     numTrees: 90,
@@ -88,6 +90,7 @@ export const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
       },
     ],
     transitions: { west: 'grasslands', east: 'dungeon' },
+    secretWall: { tx: 52, ty: 22, reward: 'potion' },
   },
   dungeon: {
     numTrees: 4,
@@ -121,6 +124,7 @@ export const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
       },
     ],
     transitions: { west: 'forest', east: 'dungeon_interior' },
+    secretWall: { tx: 8, ty: 22, reward: 'shield_fragment' },
   },
   dungeon_interior: {
     numTrees: 0,
@@ -145,6 +149,7 @@ export const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
     ],
     npcs: [],
     transitions: { west: 'dungeon', east: 'boss_room' },
+    secretWall: { tx: 52, ty: 42, reward: 'projectile_upgrade' },
   },
   boss_room: {
     numTrees: 0,

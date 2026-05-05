@@ -12,6 +12,8 @@ const FULL_SAVE = {
   savedAt: 1000,
   killedEnemies: ['grasslands:14,14', 'forest:30,14'],
   ngPlus: 0,
+  chosenSkills: [] as import('../constants').LevelUpSkill[],
+  openedSecrets: [] as string[],
 };
 
 describe('SaveSystem', () => {

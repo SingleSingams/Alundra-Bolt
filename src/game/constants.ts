@@ -80,7 +80,18 @@ export type LevelUpSkill = 'hp_up' | 'attack_up' | 'shield' | 'xp_boost' | 'spee
 
 export interface LevelUpChoice {
   skills: LevelUpSkill[];
+  chosen: LevelUpSkill[];
 }
+
+export const SKILL_SYNERGIES: Array<{
+  requires: LevelUpSkill[];
+  label: string;
+  desc: string;
+}> = [
+  { requires: ['attack_up', 'attack_up'], label: 'Durchdringende Schüsse', desc: 'Projektile treffen 2 Feinde' },
+  { requires: ['attack_up', 'shield'],    label: 'Parrier-Meister',        desc: 'Blocken gibt +3 XP' },
+  { requires: ['xp_boost', 'hp_up'],      label: 'Heilsame Tränke',        desc: 'Tränke heilen +2 extra' },
+];
 
 export interface MinimapDot {
   nx: number;

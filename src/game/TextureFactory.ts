@@ -1,6 +1,84 @@
 import * as Phaser from 'phaser';
 import { TILE_SIZE, TILE_VARIANTS } from './constants';
 
+export function createObstacleTextures(scene: Phaser.Scene): void {
+  if (!scene.textures.exists('rock')) {
+    const gfx = scene.add.graphics();
+    const s = 28;
+    gfx.fillStyle(0x78716c, 1); gfx.fillEllipse(s / 2, s / 2 + 2, s - 2, s - 8);
+    gfx.fillStyle(0xa8a29e, 1); gfx.fillEllipse(s / 2 - 3, s / 2 - 2, s - 10, s - 16);
+    gfx.lineStyle(1, 0x57534e, 0.8);
+    gfx.strokeLineShape(new Phaser.Geom.Line(10, 14, 16, 20));
+    gfx.strokeLineShape(new Phaser.Geom.Line(16, 20, 20, 16));
+    gfx.generateTexture('rock', s, s);
+    gfx.destroy();
+  }
+  if (!scene.textures.exists('blocker')) {
+    const gfx = scene.add.graphics();
+    gfx.fillStyle(0xffffff, 0.01);
+    gfx.fillRect(0, 0, 18, 14);
+    gfx.generateTexture('blocker', 18, 14);
+    gfx.destroy();
+  }
+}
+
+export function createParticleTexture(scene: Phaser.Scene): void {
+  if (!scene.textures.exists('particle-sq')) {
+    const gfx = scene.add.graphics();
+    gfx.fillStyle(0xffffff, 1);
+    gfx.fillRect(0, 0, 5, 5);
+    gfx.generateTexture('particle-sq', 5, 5);
+    gfx.destroy();
+  }
+}
+
+export function createHazardTextures(scene: Phaser.Scene): void {
+  if (!scene.textures.exists('hazard-thorns')) {
+    const g = scene.add.graphics();
+    const s = TILE_SIZE;
+    g.fillStyle(0x14532d, 1); g.fillRect(0, 0, s, s);
+    g.fillStyle(0x166534, 1);
+    for (let i = 0; i < 5; i++) {
+      const cx = 6 + i * 5;
+      g.fillTriangle(cx, 4, cx - 3, s - 4, cx + 3, s - 4);
+    }
+    g.fillStyle(0x4ade80, 0.6); g.fillRect(0, 0, s, 3);
+    g.generateTexture('hazard-thorns', s, s);
+    g.destroy();
+  }
+  if (!scene.textures.exists('hazard-lava')) {
+    const g = scene.add.graphics();
+    const s = TILE_SIZE;
+    g.fillStyle(0x7c2d12, 1); g.fillRect(0, 0, s, s);
+    g.fillStyle(0xf97316, 0.8); g.fillEllipse(s / 2, s / 2, s - 6, s - 10);
+    g.fillStyle(0xfef3c7, 0.45); g.fillEllipse(s / 2, s / 2 - 2, s * 0.4, s * 0.25);
+    g.generateTexture('hazard-lava', s, s);
+    g.destroy();
+  }
+}
+
+export function createSecretWallTexture(scene: Phaser.Scene): void {
+  if (!scene.textures.exists('secret-wall')) {
+    const g = scene.add.graphics();
+    const s = 28;
+    // Base stone — slightly lighter than rock, with golden tint
+    g.fillStyle(0x92816a, 1); g.fillEllipse(s / 2, s / 2 + 2, s - 2, s - 8);
+    g.fillStyle(0xb8a48c, 1); g.fillEllipse(s / 2 - 3, s / 2 - 2, s - 10, s - 16);
+    // Cracks (hint of something hidden)
+    g.lineStyle(1, 0x6b5742, 0.9);
+    g.strokeLineShape(new Phaser.Geom.Line(8, 12, 14, 18));
+    g.strokeLineShape(new Phaser.Geom.Line(14, 18, 18, 14));
+    g.strokeLineShape(new Phaser.Geom.Line(16, 8, 19, 13));
+    // Faint golden runes/glow hint
+    g.fillStyle(0xfde68a, 0.5);
+    g.fillCircle(s / 2, s / 2 - 2, 3);
+    g.fillStyle(0xfde68a, 0.25);
+    g.fillCircle(s / 2, s / 2 - 2, 5);
+    g.generateTexture('secret-wall', s, s);
+    g.destroy();
+  }
+}
+
 const GRASS_PALETTES = [
   { base: '#4a7c3f', detail: '#3a6432', accent: '#5e9452' },
   { base: '#527d44', detail: '#406636', accent: '#67a058' },

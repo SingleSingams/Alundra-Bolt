@@ -8,7 +8,12 @@ import {
   createPlayerTexture,
   createShadowTexture,
   createHeartTexture,
+  createObstacleTextures,
+  createParticleTexture,
+  createHazardTextures,
+  createSecretWallTexture,
 } from './TextureFactory';
+import { JuiceHelper } from './JuiceHelper';
 import {
   TILE_SIZE,
   MAP_WIDTH,
@@ -41,6 +46,7 @@ import {
   LevelUpSkill,
   NG_PLUS_HP_MULT,
   NG_PLUS_DAMAGE_MULT,
+  SKILL_SYNERGIES,
 } from './constants';
 import { SaveSystem } from './SaveSystem';
 import { Boss } from './Boss';
@@ -72,6 +78,7 @@ export class MainScene extends Phaser.Scene {
   private obstacles!: Phaser.Physics.Arcade.StaticGroup;
   private treeObstacles!: Phaser.Physics.Arcade.StaticGroup;
   private hazardGroup!: Phaser.Physics.Arcade.StaticGroup;
+  private secretWallGroup!: Phaser.Physics.Arcade.StaticGroup;
   private hazardCooldown = 0;
 
   private inventory: InventoryItem[] = [];
@@ -79,7 +86,6 @@ export class MainScene extends Phaser.Scene {
   private activeNpc: NPC | null = null;
   private currentZone: ZoneId = 'grasslands';
   private isTransitioning = false;
-  private isFreezeFraming = false;
   private ambientBreathTime = 0;
   private currentAttackDamage = ATTACK_DAMAGE;
   private currentProjectileDamage = PROJECTILE_DAMAGE;
@@ -96,6 +102,12 @@ export class MainScene extends Phaser.Scene {
   private combo = 0;
   private comboResetTimer = 0;
   private readonly COMBO_RESET_MS = 3000;
+  private chosenSkills: LevelUpSkill[] = [];
+  private openedSecrets = new Set<string>();
+  private piercingShots = 0;
+  private parryXpBonus = 0;
+  private enhancedPotions = false;
+  private juice!: JuiceHelper;
 
   constructor() {
     super({ key: 'MainScene' });
@@ -113,15 +125,19 @@ export class MainScene extends Phaser.Scene {
     this.physics.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
 
     this.buildTilemap();
-    this.createObstacleTextures();
-    this.createParticleTexture();
-    this.createHazardTextures();
+    createObstacleTextures(this);
+    createParticleTexture(this);
+    createHazardTextures(this);
+    createSecretWallTexture(this);
     Item.ensureTextures(this);
     NPC.ensureTextures(this);
+
+    this.juice = new JuiceHelper(this);
 
     this.obstacles = this.physics.add.staticGroup();
     this.treeObstacles = this.physics.add.staticGroup();
     this.hazardGroup = this.physics.add.staticGroup();
+    this.secretWallGroup = this.physics.add.staticGroup();
     this.treeGroup = this.add.group();
 
     this.player = new Player(this, centerX, centerY);
@@ -140,7 +156,10 @@ export class MainScene extends Phaser.Scene {
       this.level = save.level ?? 1;
       this.ngPlus = save.ngPlus ?? 0;
       this.killedEnemyIds = new Set(save.killedEnemies ?? []);
+      this.chosenSkills = save.chosenSkills ?? [];
+      this.openedSecrets = new Set(save.openedSecrets ?? []);
       this.recalculateAttackDamage();
+      this.checkSynergies();
       this.emitInventoryChange();
       this.game.events.emit(GAME_EVENTS.XP_CHANGE, {
         xp: this.xp, level: this.level, nextLevelXp: XP_THRESHOLDS[this.level - 1] ?? null,
@@ -208,69 +227,7 @@ export class MainScene extends Phaser.Scene {
     }
   }
 
-  // ─── Textures ─────────────────────────────────────────────────────────────
-
-  private createObstacleTextures(): void {
-    if (!this.textures.exists('rock')) {
-      const gfx = this.add.graphics();
-      const s = 28;
-      gfx.fillStyle(0x78716c, 1);
-      gfx.fillEllipse(s / 2, s / 2 + 2, s - 2, s - 8);
-      gfx.fillStyle(0xa8a29e, 1);
-      gfx.fillEllipse(s / 2 - 3, s / 2 - 2, s - 10, s - 16);
-      gfx.lineStyle(1, 0x57534e, 0.8);
-      gfx.strokeLineShape(new Phaser.Geom.Line(10, 14, 16, 20));
-      gfx.strokeLineShape(new Phaser.Geom.Line(16, 20, 20, 16));
-      gfx.generateTexture('rock', s, s);
-      gfx.destroy();
-    }
-
-    if (!this.textures.exists('blocker')) {
-      const gfx = this.add.graphics();
-      gfx.fillStyle(0xffffff, 0.01);
-      gfx.fillRect(0, 0, 18, 14);
-      gfx.generateTexture('blocker', 18, 14);
-      gfx.destroy();
-    }
-  }
-
-  private createParticleTexture(): void {
-    if (!this.textures.exists('particle-sq')) {
-      const gfx = this.add.graphics();
-      gfx.fillStyle(0xffffff, 1);
-      gfx.fillRect(0, 0, 5, 5);
-      gfx.generateTexture('particle-sq', 5, 5);
-      gfx.destroy();
-    }
-  }
-
   // ─── Hazards ──────────────────────────────────────────────────────────────
-
-  private createHazardTextures(): void {
-    if (!this.textures.exists('hazard-thorns')) {
-      const g = this.add.graphics();
-      const s = TILE_SIZE;
-      g.fillStyle(0x14532d, 1); g.fillRect(0, 0, s, s);
-      g.fillStyle(0x166534, 1);
-      for (let i = 0; i < 5; i++) {
-        const cx = 6 + i * 5;
-        g.fillTriangle(cx, 4, cx - 3, s - 4, cx + 3, s - 4);
-      }
-      g.fillStyle(0x4ade80, 0.6);
-      g.fillRect(0, 0, s, 3);
-      g.generateTexture('hazard-thorns', s, s);
-      g.destroy();
-    }
-    if (!this.textures.exists('hazard-lava')) {
-      const g = this.add.graphics();
-      const s = TILE_SIZE;
-      g.fillStyle(0x7c2d12, 1); g.fillRect(0, 0, s, s);
-      g.fillStyle(0xf97316, 0.8); g.fillEllipse(s / 2, s / 2, s - 6, s - 10);
-      g.fillStyle(0xfef3c7, 0.45); g.fillEllipse(s / 2, s / 2 - 2, s * 0.4, s * 0.25);
-      g.generateTexture('hazard-lava', s, s);
-      g.destroy();
-    }
-  }
 
   private spawnHazards(spawns: NonNullable<ZoneConfig['hazardSpawns']>): void {
     for (const h of spawns) {
@@ -281,6 +238,41 @@ export class MainScene extends Phaser.Scene {
       tile.setDepth(0.5);
       tile.refreshBody();
     }
+  }
+
+  // ─── Secret walls ─────────────────────────────────────────────────────────
+
+  private spawnSecretWall(wall: NonNullable<ZoneConfig['secretWall']>): void {
+    const secretId = `${this.currentZone}:${wall.tx},${wall.ty}`;
+    if (this.openedSecrets.has(secretId)) return;
+
+    const px = wall.tx * TILE_SIZE + TILE_SIZE / 2;
+    const py = wall.ty * TILE_SIZE + TILE_SIZE / 2;
+    const img = this.secretWallGroup.create(px, py, 'secret-wall') as Phaser.Physics.Arcade.Image;
+    img.setDepth(py);
+    img.setData('secretId', secretId);
+    img.setData('reward', wall.reward);
+    img.refreshBody();
+  }
+
+  private openSecret(wall: Phaser.Physics.Arcade.Image): void {
+    if (!wall.active) return;
+    const secretId = wall.getData('secretId') as string;
+    const reward = wall.getData('reward') as InventoryItem;
+    if (this.openedSecrets.has(secretId)) return;
+
+    this.openedSecrets.add(secretId);
+    const wx = wall.x;
+    const wy = wall.y;
+
+    this.juice.spawnParticleBurst(wx, wy, 0xfde68a, 18, 85, 550);
+    this.juice.spawnParticleBurst(wx, wy, 0xfbbf24, 12, 55, 400);
+    this.cameras.main.shake(250, 0.008);
+    SoundSystem.playChestOpen();
+
+    wall.destroy();
+    this.applyChestReward(reward);
+    this.saveCurrentState();
   }
 
   // ─── Trees ────────────────────────────────────────────────────────────────
@@ -426,6 +418,7 @@ export class MainScene extends Phaser.Scene {
     this.spawnEnemies(config.enemySpawns);
     this.spawnInitialItems(config.heartSpawns);
     if (config.hazardSpawns) this.spawnHazards(config.hazardSpawns);
+    if (config.secretWall) this.spawnSecretWall(config.secretWall);
     this.spawnNPCs(config.npcs);
     if (config.bossSpawn) {
       this.spawnBoss(config.bossSpawn.tx, config.bossSpawn.ty);
@@ -459,8 +452,8 @@ export class MainScene extends Phaser.Scene {
       this.game.events.emit(GAME_EVENTS.BOSS_HP, { hp: 0, maxHp: 0, phase: 1 });
     }
 
-    for (const proj of this.projectiles) if (proj.active) proj.destroy();
-    this.projectiles.length = 0;
+    // Deactivate pooled projectiles instead of destroying them
+    for (const proj of this.projectiles) proj.deactivate();
 
     for (const enemy of this.enemies) enemy.destroy();
     this.enemies.length = 0;
@@ -478,6 +471,7 @@ export class MainScene extends Phaser.Scene {
     this.obstacles.clear(true, true);
     this.treeObstacles.clear(true, true);
     this.hazardGroup.clear(true, true);
+    this.secretWallGroup.clear(true, true);
 
     this.activeChest = null;
     this.activeNpc = null;
@@ -570,9 +564,9 @@ export class MainScene extends Phaser.Scene {
         if (!died) {
           SoundSystem.playEnemyHit();
           this.cameras.main.shake(120, 0.004);
-          this.spawnParticleBurst(this.boss.x, this.boss.y, 0xef4444, 7, 50, 320);
-          this.showDamageNumber(this.boss.x, this.boss.y - 22, this.currentAttackDamage, false);
-          this.triggerFreezeFrame(50);
+          this.juice.spawnParticleBurst(this.boss.x, this.boss.y, 0xef4444, 7, 50, 320);
+          this.juice.showDamageNumber(this.boss.x, this.boss.y - 22, this.currentAttackDamage, false);
+          this.juice.triggerFreezeFrame(50);
         }
       }
     );
@@ -586,11 +580,11 @@ export class MainScene extends Phaser.Scene {
         const proj = projObj as Projectile;
         if (proj.isSpent() || proj.isEnemyProjectile || !this.boss?.canBeHit()) return;
         proj.hit();
-        const died = this.boss.takeDamage(this.currentProjectileDamage, (bx, by) => this.onBossDeath(bx, by));
+        const died = this.boss!.takeDamage(this.currentProjectileDamage, (bx, by) => this.onBossDeath(bx, by));
         if (!died) {
           SoundSystem.playEnemyHit();
-          this.spawnParticleBurst(this.boss.x, this.boss.y, 0xfbbf24, 5, 40, 280);
-          this.showDamageNumber(this.boss.x, this.boss.y - 22, this.currentProjectileDamage, false);
+          this.juice.spawnParticleBurst(this.boss!.x, this.boss!.y, 0xfbbf24, 5, 40, 280);
+          this.juice.showDamageNumber(this.boss!.x, this.boss!.y - 22, this.currentProjectileDamage, false);
         }
       }
     );
@@ -598,9 +592,9 @@ export class MainScene extends Phaser.Scene {
     this.game.events.once('boss-phase-2', (pos: { x: number; y: number }) => {
       SoundSystem.playBossPhase2();
       this.cameras.main.shake(450, 0.018);
-      this.spawnParticleBurst(pos.x, pos.y, 0x9333ea, 22, 95, 650);
-      this.spawnParticleBurst(pos.x, pos.y, 0xec4899, 16, 70, 500);
-      this.flashScreen();
+      this.juice.spawnParticleBurst(pos.x, pos.y, 0x9333ea, 22, 95, 650);
+      this.juice.spawnParticleBurst(pos.x, pos.y, 0xec4899, 16, 70, 500);
+      this.juice.flashScreen();
     });
   }
 
@@ -609,10 +603,10 @@ export class MainScene extends Phaser.Scene {
     this.gainXp(XP_PER_BOSS);
     SoundSystem.playBossDeath();
     this.cameras.main.shake(500, 0.022);
-    this.spawnParticleBurst(x, y, 0xef4444, 24, 110, 700);
-    this.spawnParticleBurst(x, y, 0xfbbf24, 18, 85, 580);
-    this.spawnParticleBurst(x, y, 0x9333ea, 14, 65, 450);
-    this.flashScreen();
+    this.juice.spawnParticleBurst(x, y, 0xef4444, 24, 110, 700);
+    this.juice.spawnParticleBurst(x, y, 0xfbbf24, 18, 85, 580);
+    this.juice.spawnParticleBurst(x, y, 0x9333ea, 14, 65, 450);
+    this.juice.flashScreen();
     this.spawnWorldItem(x - 24, y, 'heart_pickup');
     this.spawnWorldItem(x + 24, y, 'heart_pickup');
     this.spawnWorldItem(x, y - 24, 'heart_pickup');
@@ -723,16 +717,16 @@ export class MainScene extends Phaser.Scene {
         SoundSystem.playEnemyHit();
         HapticSystem.hit();
         this.cameras.main.shake(120, 0.004);
-        this.spawnParticleBurst(enemy.x, enemy.y, 0xef4444, 7, 50, 320);
-        this.showDamageNumber(enemy.x, enemy.y - 10, this.currentAttackDamage, false);
-        this.triggerFreezeFrame(50);
+        this.juice.spawnParticleBurst(enemy.x, enemy.y, 0xef4444, 7, 50, 320);
+        this.juice.showDamageNumber(enemy.x, enemy.y - 10, this.currentAttackDamage, false);
+        this.juice.triggerFreezeFrame(50);
         this.incrementCombo();
       },
       undefined,
       this
     );
 
-    // Player projectiles ↔ enemies
+    // Player projectiles ↔ enemies (piercing-aware)
     this.physics.add.overlap(
       this.projectiles as unknown as Phaser.GameObjects.GameObject[],
       this.enemies as unknown as Phaser.GameObjects.GameObject[],
@@ -740,12 +734,14 @@ export class MainScene extends Phaser.Scene {
         const proj = projObj as Projectile;
         const enemy = enemyObj as Enemy;
         if (proj.isSpent() || proj.isEnemyProjectile || !enemy.canBeHit()) return;
-        proj.hit();
+        const hitResult = proj.markHit(enemy.name);
+        if (hitResult === 'skip') return;
+        if (hitResult === 'normal') proj.hit();
         const eid2 = enemy.name;
         enemy.takeDamage(this.currentProjectileDamage, (ex, ey) => this.onEnemyDeath(ex, ey, eid2));
         SoundSystem.playProjectileHit();
-        this.spawnParticleBurst(enemy.x, enemy.y, 0xfbbf24, 5, 40, 280);
-        this.showDamageNumber(enemy.x, enemy.y - 10, this.currentProjectileDamage, false);
+        this.juice.spawnParticleBurst(enemy.x, enemy.y, 0xfbbf24, 5, 40, 280);
+        this.juice.showDamageNumber(enemy.x, enemy.y - 10, this.currentProjectileDamage, false);
         this.incrementCombo();
       },
       undefined,
@@ -766,6 +762,17 @@ export class MainScene extends Phaser.Scene {
       undefined,
       this
     );
+
+    // Attack zone ↔ secret walls
+    this.physics.add.overlap(
+      this.player.getAttackZone(),
+      this.secretWallGroup,
+      (_zone, wallObj) => {
+        this.openSecret(wallObj as Phaser.Physics.Arcade.Image);
+      },
+      undefined,
+      this
+    );
   }
 
   private onEnemyDeath(x: number, y: number, enemyId: string): void {
@@ -777,9 +784,9 @@ export class MainScene extends Phaser.Scene {
     this.gainXp(XP_PER_ENEMY);
     SoundSystem.playEnemyDeath();
     HapticSystem.death();
-    this.spawnParticleBurst(x, y, 0xef4444, 12, 70, 500);
-    this.spawnParticleBurst(x, y, 0xfbbf24, 6, 45, 400);
-    this.flashScreen();
+    this.juice.spawnParticleBurst(x, y, 0xef4444, 12, 70, 500);
+    this.juice.spawnParticleBurst(x, y, 0xfbbf24, 6, 45, 400);
+    this.juice.flashScreen();
   }
 
   private incrementCombo(): void {
@@ -801,9 +808,9 @@ export class MainScene extends Phaser.Scene {
     SoundSystem.playPlayerDamage();
     HapticSystem.hit();
     this.resetCombo();
-    this.spawnParticleBurst(pos.x, pos.y, 0xffffff, 8, 55, 350);
-    this.spawnParticleBurst(pos.x, pos.y, 0xfde68a, 5, 35, 280);
-    this.showDamageNumber(pos.x, pos.y - 10, 2, false);
+    this.juice.spawnParticleBurst(pos.x, pos.y, 0xffffff, 8, 55, 350);
+    this.juice.spawnParticleBurst(pos.x, pos.y, 0xfde68a, 5, 35, 280);
+    this.juice.showDamageNumber(pos.x, pos.y - 10, 2, false);
     if (this.player.getHp() <= 1) HapticSystem.danger();
     if (this.player.getHp() > 0) {
       this.saveCurrentState();
@@ -812,87 +819,50 @@ export class MainScene extends Phaser.Scene {
 
   private onShieldBlock(pos: { x: number; y: number }): void {
     SoundSystem.playShieldBlock();
-    this.spawnParticleBurst(pos.x, pos.y, 0x60a5fa, 10, 45, 320);
-    this.spawnParticleBurst(pos.x, pos.y, 0xbfdbfe, 6, 28, 240);
-    this.showDamageNumber(pos.x, pos.y - 10, 0, true);
+    this.juice.spawnParticleBurst(pos.x, pos.y, 0x60a5fa, 10, 45, 320);
+    this.juice.spawnParticleBurst(pos.x, pos.y, 0xbfdbfe, 6, 28, 240);
+    this.juice.showDamageNumber(pos.x, pos.y - 10, 0, true);
     this.cameras.main.shake(80, 0.003);
+    if (this.parryXpBonus > 0) this.gainXp(this.parryXpBonus);
   }
 
-  // ─── Juice helpers ────────────────────────────────────────────────────────
+  // ─── Projectile pool ──────────────────────────────────────────────────────
 
-  private spawnParticleBurst(
-    x: number, y: number,
-    color: number,
-    count: number,
-    spread: number,
-    lifetime: number
-  ): void {
-    for (let i = 0; i < count; i++) {
-      const angle = (Math.PI * 2 * i) / count + Phaser.Math.FloatBetween(-0.4, 0.4);
-      const speed = Phaser.Math.FloatBetween(spread * 0.35, spread);
-      const sq = this.add.image(x, y, 'particle-sq');
-      sq.setTint(color);
-      sq.setDepth(9990);
-      this.tweens.add({
-        targets: sq,
-        x: x + Math.cos(angle) * speed,
-        y: y + Math.sin(angle) * speed - spread * 0.15,
-        alpha: 0,
-        scaleX: 0,
-        scaleY: 0,
-        duration: lifetime,
-        ease: 'Sine.easeOut',
-        onComplete: () => sq.destroy(),
-      });
+  private getProjectile(x: number, y: number, angle: number, isEnemy: boolean, piercing = 0): Projectile {
+    const inactive = this.projectiles.find(p => !p.active);
+    if (inactive) {
+      inactive.reset(x, y, angle, isEnemy, piercing);
+      return inactive;
     }
+    const proj = new Projectile(this, x, y, angle, isEnemy);
+    if (piercing > 0) proj.setPiercing(piercing);
+    this.projectiles.push(proj);
+    return proj;
   }
 
-  private showDamageNumber(worldX: number, worldY: number, amount: number, isHeal: boolean): void {
-    const label = isHeal ? `+${amount}` : `-${amount}`;
-    const text = this.add.text(worldX, worldY, label, {
-      fontFamily: 'ui-monospace, monospace',
-      fontSize: '13px',
-      color: isHeal ? '#4ade80' : '#f87171',
-      stroke: '#000000',
-      strokeThickness: 3,
-      resolution: 2,
-    });
-    text.setOrigin(0.5, 1);
-    text.setDepth(9991);
-    this.tweens.add({
-      targets: text,
-      y: worldY - 42,
-      alpha: 0,
-      duration: 620,
-      ease: 'Sine.easeOut',
-      onComplete: () => text.destroy(),
-    });
-  }
+  // ─── Skill synergies ──────────────────────────────────────────────────────
 
-  private flashScreen(): void {
-    const cam = this.cameras.main;
-    const overlay = this.add.graphics();
-    overlay.fillStyle(0xffffff, 1);
-    overlay.fillRect(0, 0, cam.width, cam.height);
-    overlay.setScrollFactor(0);
-    overlay.setDepth(99998);
-    overlay.setAlpha(0.3);
-    this.tweens.add({
-      targets: overlay,
-      alpha: 0,
-      duration: 90,
-      onComplete: () => overlay.destroy(),
-    });
-  }
+  private checkSynergies(): void {
+    for (const syn of SKILL_SYNERGIES) {
+      const needed = [...syn.requires];
+      const available = [...this.chosenSkills];
+      let matched = true;
+      for (const req of needed) {
+        const idx = available.indexOf(req);
+        if (idx === -1) { matched = false; break; }
+        available.splice(idx, 1);
+      }
+      if (!matched) continue;
 
-  private triggerFreezeFrame(durationMs: number): void {
-    if (this.isFreezeFraming) return;
-    this.isFreezeFraming = true;
-    window.setTimeout(() => {
-      this.scene.resume();
-      this.isFreezeFraming = false;
-    }, durationMs);
-    this.scene.pause();
+      // Apply synergy effects idempotently
+      if (syn.label === 'Durchdringende Schüsse' && this.piercingShots < 2) {
+        this.piercingShots = 2;
+      } else if (syn.label === 'Parrier-Meister' && this.parryXpBonus === 0) {
+        this.parryXpBonus = 3;
+      } else if (syn.label === 'Heilsame Tränke' && !this.enhancedPotions) {
+        this.enhancedPotions = true;
+      }
+    }
   }
 
   // ─── Minimap ──────────────────────────────────────────────────────────────
@@ -938,6 +908,8 @@ export class MainScene extends Phaser.Scene {
       savedAt: Date.now(),
       killedEnemies: [...this.killedEnemyIds],
       ngPlus: this.ngPlus,
+      chosenSkills: [...this.chosenSkills],
+      openedSecrets: [...this.openedSecrets],
     });
   }
 
@@ -962,8 +934,8 @@ export class MainScene extends Phaser.Scene {
     this.game.events.emit(GAME_EVENTS.XP_CHANGE, {
       xp: this.xp, level: this.level, nextLevelXp: XP_THRESHOLDS[this.level - 1] ?? null,
     });
-    this.spawnParticleBurst(this.player.x, this.player.y, 0xfde68a, 16, 80, 500);
-    this.spawnParticleBurst(this.player.x, this.player.y, 0x4ade80, 12, 60, 400);
+    this.juice.spawnParticleBurst(this.player.x, this.player.y, 0xfde68a, 16, 80, 500);
+    this.juice.spawnParticleBurst(this.player.x, this.player.y, 0x4ade80, 12, 60, 400);
     this.cameras.main.shake(200, 0.006);
     this.saveCurrentState();
 
@@ -971,11 +943,12 @@ export class MainScene extends Phaser.Scene {
     const shuffled = allSkills.sort(() => Math.random() - 0.5);
     const choices = shuffled.slice(0, 3);
     this.scene.pause();
-    this.game.events.emit(GAME_EVENTS.LEVEL_UP_CHOICE, { skills: choices });
+    this.game.events.emit(GAME_EVENTS.LEVEL_UP_CHOICE, { skills: choices, chosen: [...this.chosenSkills] });
   }
 
   private handleSkillChosen(skill: LevelUpSkill): void {
     this.scene.resume();
+    this.chosenSkills.push(skill);
     switch (skill) {
       case 'hp_up':
         this.player.setHp(Math.min(MAX_HP + 2, this.player.getHp() + 2));
@@ -993,7 +966,8 @@ export class MainScene extends Phaser.Scene {
         this.player.applySpeedBoost(1.15);
         break;
     }
-    this.spawnParticleBurst(this.player.x, this.player.y, 0xfde68a, 18, 90, 550);
+    this.checkSynergies();
+    this.juice.spawnParticleBurst(this.player.x, this.player.y, 0xfde68a, 18, 90, 550);
     this.saveCurrentState();
   }
 
@@ -1034,16 +1008,15 @@ export class MainScene extends Phaser.Scene {
           const isPotion = item.itemType === 'potion_pickup';
           item.collect(() => {
             if (isPotion) {
-              // Potions are stored in inventory; use them manually via E / tap
               SoundSystem.playPickup();
               this.addToInventory('potion');
-              this.spawnParticleBurst(ix, iy, 0x4ade80, 6, 36, 350);
+              this.juice.spawnParticleBurst(ix, iy, 0x4ade80, 6, 36, 350);
             } else {
               this.player.heal(HEART_HEAL_AMOUNT);
               SoundSystem.playHeal();
               this.addToInventory('heart');
-              this.spawnParticleBurst(ix, iy, 0x4ade80, 8, 42, 400);
-              this.showDamageNumber(ix, iy - 8, HEART_HEAL_AMOUNT, true);
+              this.juice.spawnParticleBurst(ix, iy, 0x4ade80, 8, 42, 400);
+              this.juice.showDamageNumber(ix, iy - 8, HEART_HEAL_AMOUNT, true);
             }
           });
         }
@@ -1101,7 +1074,7 @@ export class MainScene extends Phaser.Scene {
         if (reward) {
           SoundSystem.playChestOpen();
           this.applyChestReward(reward);
-          this.spawnParticleBurst(chestX, chestY, 0x4ade80, 10, 55, 480);
+          this.juice.spawnParticleBurst(chestX, chestY, 0x4ade80, 10, 55, 480);
         }
         this.activeChest = null;
       }
@@ -1131,11 +1104,12 @@ export class MainScene extends Phaser.Scene {
     const idx = this.inventory.indexOf('potion');
     if (idx === -1 || this.player.getHp() >= MAX_HP) return;
     this.inventory.splice(idx, 1);
-    this.player.heal(POTION_HEAL_AMOUNT);
+    const healAmount = POTION_HEAL_AMOUNT + (this.enhancedPotions ? 2 : 0);
+    this.player.heal(healAmount);
     SoundSystem.playHeal();
     this.emitInventoryChange();
-    this.spawnParticleBurst(this.player.x, this.player.y, 0x4ade80, 10, 50, 450);
-    this.showDamageNumber(this.player.x, this.player.y - 20, POTION_HEAL_AMOUNT, true);
+    this.juice.spawnParticleBurst(this.player.x, this.player.y, 0x4ade80, 10, 50, 450);
+    this.juice.showDamageNumber(this.player.x, this.player.y - 20, healAmount, true);
     this.saveCurrentState();
   }
 
@@ -1171,8 +1145,7 @@ export class MainScene extends Phaser.Scene {
       enemy.update(this.player, delta);
       if (enemy.wantsShoot(this.player)) {
         const angle = enemy.getShootAngle(this.player.x, this.player.y);
-        const proj = new Projectile(this, enemy.x, enemy.y, angle, true);
-        this.projectiles.push(proj);
+        this.getProjectile(enemy.x, enemy.y, angle, true);
         enemy.markShot();
         SoundSystem.playProjectile();
       }
@@ -1191,25 +1164,22 @@ export class MainScene extends Phaser.Scene {
       if (this.boss.wantsShoot()) {
         const angles = this.boss.getShootAngles(this.player.x, this.player.y);
         for (const angle of angles) {
-          const proj = new Projectile(this, this.boss.x, this.boss.y, angle, true);
-          this.projectiles.push(proj);
+          this.getProjectile(this.boss.x, this.boss.y, angle, true);
         }
         this.boss.markShot();
         SoundSystem.playProjectile();
       }
     }
 
-    // Update and prune projectiles
-    this.projectiles = this.projectiles.filter(p => p.active);
+    // Update projectiles (pool-aware: skip inactive)
     for (const proj of this.projectiles) {
-      proj.update(delta);
+      if (proj.active) proj.update(delta);
     }
 
     // Ranged attack: Y key
     if (this.player.wantsShoot()) {
       const angle = DIRECTION_ANGLES[this.player.getLastDirection()] ?? 0;
-      const proj = new Projectile(this, this.player.x, this.player.y, angle);
-      this.projectiles.push(proj);
+      this.getProjectile(this.player.x, this.player.y, angle, false, this.piercingShots);
       this.player.markShot();
       SoundSystem.playProjectile();
     }

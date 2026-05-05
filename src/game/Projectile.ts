@@ -6,7 +6,11 @@ const PROJECTILE_LIFETIME = 1100;
 export class Projectile extends Phaser.GameObjects.Image {
   private lifetime = PROJECTILE_LIFETIME;
   private spent = false;
-  readonly isEnemyProjectile: boolean;
+  isEnemyProjectile: boolean;
+
+  // Piercing: track which enemies this projectile has already hit
+  private readonly hitEnemies = new Set<string>();
+  private piercingHitsRemaining = 0;
 
   constructor(scene: Phaser.Scene, x: number, y: number, angleDeg: number, isEnemy = false) {
     super(scene, x, y, isEnemy ? 'projectile-enemy' : 'projectile');
@@ -49,14 +53,65 @@ export class Projectile extends Phaser.GameObjects.Image {
     }
   }
 
+  // ─── Pool support ────────────────────────────────────────────────────────
+
+  reset(x: number, y: number, angleDeg: number, isEnemy: boolean, piercing = 0): void {
+    this.isEnemyProjectile = isEnemy;
+    this.spent = false;
+    this.lifetime = PROJECTILE_LIFETIME;
+    this.hitEnemies.clear();
+    this.piercingHitsRemaining = piercing;
+
+    this.setTexture(isEnemy ? 'projectile-enemy' : 'projectile');
+    this.setPosition(x, y);
+    this.setActive(true);
+    this.setVisible(true);
+    this.setAlpha(1);
+    this.setScale(1);
+    this.setDepth(5000);
+
+    const body = this.body as Phaser.Physics.Arcade.Body;
+    body.enable = true;
+    body.reset(x, y);
+    const rad = Phaser.Math.DegToRad(angleDeg);
+    body.setVelocity(Math.cos(rad) * PROJECTILE_SPEED, Math.sin(rad) * PROJECTILE_SPEED);
+  }
+
+  deactivate(): void {
+    this.spent = true;
+    this.setActive(false);
+    this.setVisible(false);
+    const body = this.body as Phaser.Physics.Arcade.Body;
+    body.enable = false;
+    body.setVelocity(0, 0);
+  }
+
+  // ─── Piercing ────────────────────────────────────────────────────────────
+
+  /** Returns 'normal' (spend on hit), 'pierce' (damage but stay alive), or 'skip' (already hit). */
+  markHit(enemyId: string): 'normal' | 'pierce' | 'skip' {
+    if (this.hitEnemies.has(enemyId)) return 'skip';
+    this.hitEnemies.add(enemyId);
+    if (this.piercingHitsRemaining > 0) {
+      this.piercingHitsRemaining--;
+      return 'pierce';
+    }
+    return 'normal';
+  }
+
+  setPiercing(count: number): void {
+    this.piercingHitsRemaining = count;
+  }
+
+  // ─── Lifecycle ───────────────────────────────────────────────────────────
+
   update(delta: number): void {
-    if (this.spent || !this.scene) return;
+    if (this.spent || !this.scene || !this.active) return;
     this.lifetime -= delta;
     if (this.lifetime <= 0) {
-      this.destroy();
+      this.deactivate();
       return;
     }
-    // Fade near end of life
     if (this.lifetime < 220) {
       this.setAlpha(this.lifetime / 220);
     }
@@ -74,7 +129,7 @@ export class Projectile extends Phaser.GameObjects.Image {
       scaleY: 2.2,
       duration: 130,
       ease: 'Sine.easeOut',
-      onComplete: () => this.destroy(),
+      onComplete: () => this.deactivate(),
     });
   }
 

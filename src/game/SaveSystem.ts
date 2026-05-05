@@ -1,4 +1,4 @@
-import { ZoneId, InventoryItem, ZONES } from './constants';
+import { ZoneId, InventoryItem, LevelUpSkill, ZONES } from './constants';
 
 export interface SaveData {
   hp: number;
@@ -9,6 +9,8 @@ export interface SaveData {
   savedAt: number;
   killedEnemies: string[];
   ngPlus: number;
+  chosenSkills: LevelUpSkill[];
+  openedSecrets: string[];
 }
 
 export interface SlotPreview {
@@ -33,6 +35,8 @@ const defaults: SaveData = {
   savedAt: 0,
   killedEnemies: [],
   ngPlus: 0,
+  chosenSkills: [],
+  openedSecrets: [],
 };
 
 function parseSlot(slot: number): SaveData | null {
@@ -49,6 +53,8 @@ function parseSlot(slot: number): SaveData | null {
       savedAt: p.savedAt ?? defaults.savedAt,
       killedEnemies: p.killedEnemies ?? defaults.killedEnemies,
       ngPlus: p.ngPlus ?? defaults.ngPlus,
+      chosenSkills: (p as Partial<SaveData>).chosenSkills ?? defaults.chosenSkills,
+      openedSecrets: (p as Partial<SaveData>).openedSecrets ?? defaults.openedSecrets,
     };
   } catch {
     return null;

@@ -21,6 +21,8 @@ export function VictoryScreen({ isOpen, level, xp, ngPlus }: Props) {
       savedAt: Date.now(),
       killedEnemies: [],
       ngPlus: ngPlus + 1,
+      chosenSkills: [],
+      openedSecrets: [],
     });
     window.location.reload();
   };
