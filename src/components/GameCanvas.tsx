@@ -271,7 +271,7 @@ export function GameCanvas() {
         combo={combo}
         onUsePotion={handleUsePotion}
       />
-      {settings.showTouchControls && <TouchControls />}
+      {settings.showTouchControls && !dialog && <TouchControls />}
       {levelUpNotice !== null && (
         <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-50 text-center animate-in fade-in zoom-in duration-300">
           <div className="bg-amber-900/80 border-2 border-amber-400/80 text-amber-200 font-bold

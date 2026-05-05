@@ -95,8 +95,11 @@ export function DialogBox({ isOpen, npcName, lines, onClose }: DialogBoxProps) {
   const isTypingDone = displayed.length >= currentLine.length;
 
   return (
-    <div className="absolute inset-0 pointer-events-none flex items-end justify-center pb-8 z-20">
-      <div className="pointer-events-auto w-[min(640px,calc(100%-3rem))] animate-in slide-in-from-bottom-4 fade-in duration-200">
+    <div
+      className="absolute inset-0 pointer-events-none flex items-end justify-center z-20"
+      style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}
+    >
+      <div className="pointer-events-auto w-[min(640px,calc(100%-2rem))] animate-in slide-in-from-bottom-4 fade-in duration-200">
         <Card className="bg-stone-900/95 border-amber-600/50 border-2 backdrop-blur-md shadow-2xl overflow-hidden">
           <div className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-amber-900/40 to-stone-900/40 border-b border-amber-700/40">
             <div className="w-7 h-7 rounded-full bg-blue-700 border border-blue-400/60 flex items-center justify-center shadow-inner">
@@ -127,29 +130,30 @@ export function DialogBox({ isOpen, npcName, lines, onClose }: DialogBoxProps) {
             </div>
           </div>
 
-          <div className="px-5 py-4 min-h-[88px]">
+          {/* Tap entire text area to advance */}
+          <button
+            onClick={advance}
+            className="w-full text-left px-5 py-4 min-h-[80px] active:bg-stone-800/40 transition-colors"
+          >
             <p className="text-stone-100 leading-relaxed text-sm">
               {displayed}
               {!isTypingDone && (
                 <span className="inline-block w-0.5 h-4 bg-amber-300 ml-0.5 align-middle animate-pulse" />
               )}
             </p>
-          </div>
+          </button>
 
-          <div className="flex items-center justify-between px-4 py-2 bg-stone-950/60 border-t border-stone-700/60">
+          <div className="flex items-center justify-between px-4 py-3 bg-stone-950/60 border-t border-stone-700/60">
             <div className="text-[11px] text-stone-400">
               Seite <span className="text-amber-300 font-semibold">{pageIndex + 1}</span>{' '}
               von <span className="text-stone-300">{lines.length}</span>
             </div>
             <button
               onClick={advance}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-600/20 hover:bg-amber-600/30 border border-amber-600/40 text-amber-200 text-xs font-medium transition-colors"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-amber-600/30 hover:bg-amber-600/40 active:bg-amber-600/50 border border-amber-500/50 text-amber-200 text-sm font-semibold transition-colors"
             >
-              <kbd className="px-1 py-0.5 text-[9px] font-mono bg-stone-800 rounded border border-stone-600 leading-none">
-                Z
-              </kbd>
               <span>{!isTypingDone ? 'Überspringen' : isLast ? 'Schließen' : 'Weiter'}</span>
-              <ChevronRight className="w-3 h-3" />
+              <ChevronRight className="w-4 h-4" />
             </button>
           </div>
         </Card>
