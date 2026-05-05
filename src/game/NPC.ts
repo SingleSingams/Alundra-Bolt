@@ -1,5 +1,7 @@
 import * as Phaser from 'phaser';
 
+const NPC_SCALE = 0.19;
+
 export interface NPCDefinition {
   id: string;
   name: string;
@@ -13,11 +15,10 @@ export class NPC extends Phaser.GameObjects.Container {
   public readonly npcName: string;
   public readonly lines: string[];
 
-  private sprite: Phaser.GameObjects.Image;
+  private sprite: Phaser.GameObjects.Sprite;
   private shadow: Phaser.GameObjects.Image;
   private nameTag: Phaser.GameObjects.Text;
   private promptGfx: Phaser.GameObjects.Graphics;
-  private bobTime = 0;
   private promptVisible = false;
 
   constructor(scene: Phaser.Scene, def: NPCDefinition) {
@@ -27,13 +28,20 @@ export class NPC extends Phaser.GameObjects.Container {
     this.npcName = def.name;
     this.lines = def.lines;
 
-    NPC.ensureTextures(scene);
+    const useSprite = scene.textures.exists('npc-elder');
+    this.shadow = scene.add.image(0, 14, 'shadow').setAlpha(0.45).setScale(1.4, 0.45);
 
-    this.shadow = scene.add.image(0, 10, 'shadow').setAlpha(0.45);
-    this.sprite = scene.add.image(0, 0, 'npc');
+    if (useSprite) {
+      this.sprite = scene.add.sprite(0, 0, 'npc-elder', 0).setScale(NPC_SCALE);
+      this.sprite.play('elder-idle');
+    } else {
+      NPC.ensureTextures(scene);
+      this.sprite = scene.add.sprite(0, 0, 'npc').setScale(1);
+    }
+
     this.promptGfx = scene.add.graphics();
 
-    this.nameTag = scene.add.text(0, -24, def.name, {
+    this.nameTag = scene.add.text(0, -34, def.name, {
       fontFamily: 'ui-sans-serif, system-ui, sans-serif',
       fontSize: '10px',
       color: '#fef3c7',
@@ -59,43 +67,26 @@ export class NPC extends Phaser.GameObjects.Container {
     if (scene.textures.exists('npc')) return;
     const gfx = scene.add.graphics();
     const s = 24;
-
-    // Body (blue robe)
     gfx.fillStyle(0x1e3a8a, 1);
     gfx.fillRect(3, 6, s - 6, s - 8);
-
-    // Robe highlight
     gfx.fillStyle(0x3b82f6, 1);
     gfx.fillRect(4, 7, s - 8, 4);
-
-    // Head
     gfx.fillStyle(0xfcd5b5, 1);
     gfx.fillRect(6, 2, s - 12, 6);
-
-    // Hat / hair
     gfx.fillStyle(0x0c1e4a, 1);
     gfx.fillRect(5, 1, s - 10, 3);
-
-    // Eyes
     gfx.fillStyle(0x111111, 1);
     gfx.fillRect(8, 5, 2, 1);
     gfx.fillRect(s - 10, 5, 2, 1);
-
-    // Belt
     gfx.fillStyle(0x7c2d12, 1);
     gfx.fillRect(4, 14, s - 8, 2);
-
-    // Buckle
     gfx.fillStyle(0xfbbf24, 1);
     gfx.fillRect(11, 14, 3, 2);
-
     gfx.generateTexture('npc', s, s);
     gfx.destroy();
   }
 
-  update(delta: number): void {
-    this.bobTime += delta * 0.0025;
-    this.sprite.y = Math.sin(this.bobTime) * 1.2;
+  update(_delta: number): void {
     this.setDepth(this.y + 1);
   }
 
@@ -106,16 +97,14 @@ export class NPC extends Phaser.GameObjects.Container {
     if (!show) return;
 
     this.promptGfx.fillStyle(0x1f2937, 0.9);
-    this.promptGfx.fillRoundedRect(-13, -42, 26, 14, 3);
+    this.promptGfx.fillRoundedRect(-13, -52, 26, 14, 3);
     this.promptGfx.lineStyle(1, 0xfef08a, 1);
-    this.promptGfx.strokeRoundedRect(-13, -42, 26, 14, 3);
+    this.promptGfx.strokeRoundedRect(-13, -52, 26, 14, 3);
 
     this.promptGfx.fillStyle(0xfef08a, 1);
-    // Small speech-bubble indicator dots
-    this.promptGfx.fillCircle(-5, -35, 1.2);
-    this.promptGfx.fillCircle(0, -35, 1.2);
-    this.promptGfx.fillCircle(5, -35, 1.2);
-    // Tail
-    this.promptGfx.fillTriangle(-2, -28, 2, -28, 0, -24);
+    this.promptGfx.fillCircle(-5, -45, 1.2);
+    this.promptGfx.fillCircle(0, -45, 1.2);
+    this.promptGfx.fillCircle(5, -45, 1.2);
+    this.promptGfx.fillTriangle(-2, -38, 2, -38, 0, -34);
   }
 }
