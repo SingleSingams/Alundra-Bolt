@@ -96,24 +96,21 @@ export function DialogBox({ isOpen, npcName, lines, onClose }: DialogBoxProps) {
 
   return (
     <div
-      className="absolute inset-0 pointer-events-none flex items-end justify-center z-20"
-      style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}
+      className="absolute inset-x-0 bottom-0 pointer-events-none flex items-end justify-center z-20 px-3"
+      style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
     >
-      <div className="pointer-events-auto w-[min(640px,calc(100%-2rem))] animate-in slide-in-from-bottom-4 fade-in duration-200">
+      <div className="pointer-events-auto w-full max-w-xl animate-in slide-in-from-bottom-4 fade-in duration-200">
         <Card className="bg-stone-900/95 border-amber-600/50 border-2 backdrop-blur-md shadow-2xl overflow-hidden">
-          <div className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-amber-900/40 to-stone-900/40 border-b border-amber-700/40">
-            <div className="w-7 h-7 rounded-full bg-blue-700 border border-blue-400/60 flex items-center justify-center shadow-inner">
-              <MessageSquare className="w-3.5 h-3.5 text-blue-100" />
+          <div className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-amber-900/40 to-stone-900/40 border-b border-amber-700/40">
+            <div className="w-6 h-6 rounded-full bg-blue-700 border border-blue-400/60 flex items-center justify-center shadow-inner flex-shrink-0">
+              <MessageSquare className="w-3 h-3 text-blue-100" />
             </div>
-            <div className="flex-1">
-              <div className="text-[10px] uppercase tracking-[0.2em] text-amber-400/80 font-bold">
-                Gespräch mit
-              </div>
-              <div className="text-amber-100 font-semibold tracking-wide leading-tight">
+            <div className="flex-1 min-w-0">
+              <div className="text-amber-100 font-semibold text-sm leading-tight truncate">
                 {npcName}
               </div>
             </div>
-            <div className="flex gap-1">
+            <div className="flex gap-1 flex-shrink-0">
               {lines.map((_, i) => (
                 <div
                   key={i}
@@ -133,9 +130,10 @@ export function DialogBox({ isOpen, npcName, lines, onClose }: DialogBoxProps) {
           {/* Tap entire text area to advance */}
           <button
             onClick={advance}
-            className="w-full text-left px-5 py-4 min-h-[80px] active:bg-stone-800/40 transition-colors"
+            className="w-full text-left px-4 py-3 min-h-[72px] bg-transparent border-0 outline-none"
+            style={{ color: '#f1f0ef' }}
           >
-            <p className="text-stone-100 leading-relaxed text-sm">
+            <p className="leading-relaxed text-sm">
               {displayed}
               {!isTypingDone && (
                 <span className="inline-block w-0.5 h-4 bg-amber-300 ml-0.5 align-middle animate-pulse" />
@@ -143,14 +141,14 @@ export function DialogBox({ isOpen, npcName, lines, onClose }: DialogBoxProps) {
             </p>
           </button>
 
-          <div className="flex items-center justify-between px-4 py-3 bg-stone-950/60 border-t border-stone-700/60">
+          <div className="flex items-center justify-between px-3 py-2 bg-stone-950/60 border-t border-stone-700/60">
             <div className="text-[11px] text-stone-400">
-              Seite <span className="text-amber-300 font-semibold">{pageIndex + 1}</span>{' '}
-              von <span className="text-stone-300">{lines.length}</span>
+              {pageIndex + 1} / {lines.length}
             </div>
             <button
               onClick={advance}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-amber-600/30 hover:bg-amber-600/40 active:bg-amber-600/50 border border-amber-500/50 text-amber-200 text-sm font-semibold transition-colors"
+              className="flex items-center gap-1.5 px-5 py-2 rounded-lg bg-amber-600/30 active:bg-amber-600/60 border border-amber-500/50 font-semibold transition-colors"
+              style={{ color: '#fde68a', fontSize: '14px' }}
             >
               <span>{!isTypingDone ? 'Überspringen' : isLast ? 'Schließen' : 'Weiter'}</span>
               <ChevronRight className="w-4 h-4" />
