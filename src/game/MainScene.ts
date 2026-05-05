@@ -73,6 +73,7 @@ export class MainScene extends Phaser.Scene {
   private npcs: NPC[] = [];
   private transitionZones: Array<{ zone: Phaser.GameObjects.Zone; target: ZoneId; edge: EdgeDirection }> = [];
   private treeGroup!: Phaser.GameObjects.Group;
+  private decorGroup!: Phaser.GameObjects.Group;
   private groundLayer!: Phaser.Tilemaps.TilemapLayer;
   private obstacles!: Phaser.Physics.Arcade.StaticGroup;
   private treeObstacles!: Phaser.Physics.Arcade.StaticGroup;
@@ -137,6 +138,7 @@ export class MainScene extends Phaser.Scene {
     this.hazardGroup = this.physics.add.staticGroup();
     this.secretWallGroup = this.physics.add.staticGroup();
     this.treeGroup = this.add.group();
+    this.decorGroup = this.add.group();
 
     this.player = new Player(this, centerX, centerY);
     this.setupPersistentColliders();
@@ -293,47 +295,93 @@ export class MainScene extends Phaser.Scene {
   }
 
   private drawTree(x: number, y: number): void {
-    const trunkGfx = this.add.graphics();
-    trunkGfx.fillStyle(0x6b4226, 1);
-    trunkGfx.fillRect(-5, -6, 10, 12);
-    const trunkKey = `tree-trunk-${x}-${y}`;
-    if (!this.textures.exists(trunkKey)) {
-      trunkGfx.generateTexture(trunkKey, 10, 12);
+    if (this.textures.exists('decor-tree')) {
+      // Use real pixel-art tree sprite
+      const shadow = this.add.ellipse(x + 4, y + 22, 52, 16, 0x000000, 0.20);
+      shadow.setDepth(0.1);
+      const tree = this.add.image(x, y - 10, 'decor-tree').setScale(0.30);
+      tree.setDepth(y + 0.5);
+      this.treeGroup.add(shadow);
+      this.treeGroup.add(tree);
+      return;
     }
-    trunkGfx.destroy();
 
+    // Fallback procedural tree
     const shadowGfx = this.add.graphics();
     shadowGfx.fillStyle(0x000000, 0.2);
     shadowGfx.fillEllipse(0, 0, 38, 14);
     const shadowKey = `tree-shadow-${x}-${y}`;
-    if (!this.textures.exists(shadowKey)) {
-      shadowGfx.generateTexture(shadowKey, 38, 14);
-    }
+    if (!this.textures.exists(shadowKey)) shadowGfx.generateTexture(shadowKey, 38, 14);
     shadowGfx.destroy();
 
-    const shadow = this.add.image(x + 6, y + 10, shadowKey);
-    shadow.setDepth(0.1);
-
     const canopyGfx = this.add.graphics();
-    canopyGfx.fillStyle(0x2d6a35, 1);
-    canopyGfx.fillCircle(0, 0, 22);
-    canopyGfx.fillStyle(0x3a8044, 1);
-    canopyGfx.fillCircle(-7, -6, 14);
-    canopyGfx.fillCircle(8, -4, 16);
+    canopyGfx.fillStyle(0x2d6a35, 1); canopyGfx.fillCircle(0, 0, 22);
+    canopyGfx.fillStyle(0x3a8044, 1); canopyGfx.fillCircle(-7, -6, 14); canopyGfx.fillCircle(8, -4, 16);
     const canopyKey = `tree-canopy-${x}-${y}`;
-    if (!this.textures.exists(canopyKey)) {
-      canopyGfx.generateTexture(canopyKey, 48, 48);
-    }
+    if (!this.textures.exists(canopyKey)) canopyGfx.generateTexture(canopyKey, 48, 48);
     canopyGfx.destroy();
 
-    const trunk = this.add.image(x, y, trunkKey);
-    trunk.setDepth(y);
-    const canopy = this.add.image(x, y - 18, canopyKey);
-    canopy.setDepth(y + 0.5);
-
+    const shadow = this.add.image(x + 6, y + 10, shadowKey); shadow.setDepth(0.1);
+    const canopy = this.add.image(x, y - 18, canopyKey); canopy.setDepth(y + 0.5);
     this.treeGroup.add(shadow);
-    this.treeGroup.add(trunk);
     this.treeGroup.add(canopy);
+  }
+
+  // ─── Decorations (non-blocking world dressing) ────────────────────────────
+
+  private placeDecorations(zone: ZoneId, protectedTiles: Set<string>): void {
+    type DecorSet = { keys: string[]; scale: number; count: number };
+
+    const byZone: Partial<Record<ZoneId, DecorSet[]>> = {
+      grasslands: [
+        { keys: ['decor-bush-yellow', 'decor-bush-berry', 'decor-bush-flower'], scale: 0.28, count: 18 },
+        { keys: ['decor-bush'], scale: 0.26, count: 12 },
+        { keys: ['decor-rock'], scale: 0.22, count: 8 },
+      ],
+      forest: [
+        { keys: ['decor-log', 'decor-stump'], scale: 0.28, count: 14 },
+        { keys: ['decor-bush', 'decor-bush-berry'], scale: 0.26, count: 16 },
+        { keys: ['decor-rock'], scale: 0.22, count: 6 },
+      ],
+      dungeon: [
+        { keys: ['decor-rock'], scale: 0.22, count: 10 },
+        { keys: ['decor-dungeon-wall'], scale: 0.30, count: 5 },
+      ],
+      dungeon_interior: [
+        { keys: ['decor-rock'], scale: 0.20, count: 8 },
+        { keys: ['decor-dungeon-wall'], scale: 0.30, count: 6 },
+      ],
+      boss_room: [
+        { keys: ['decor-dungeon-gate'], scale: 0.32, count: 2 },
+        { keys: ['decor-dungeon-wall'], scale: 0.28, count: 4 },
+      ],
+    };
+
+    const sets = byZone[zone] ?? [];
+    const margin = 3;
+
+    for (const { keys, scale, count } of sets) {
+      for (let i = 0; i < count; i++) {
+        let attempts = 0;
+        while (attempts++ < 20) {
+          const tx = Phaser.Math.Between(margin, MAP_WIDTH - margin);
+          const ty = Phaser.Math.Between(margin, MAP_HEIGHT - margin);
+          const key = `${tx},${ty}`;
+          if (protectedTiles.has(key)) continue;
+          const px = tx * TILE_SIZE + TILE_SIZE / 2;
+          const py = ty * TILE_SIZE + TILE_SIZE / 2;
+          if (Math.abs(px - centerX) < 100 && Math.abs(py - centerY) < 100) continue;
+
+          const texKey = keys[Math.floor(Math.random() * keys.length)];
+          if (!this.textures.exists(texKey)) break;
+
+          const img = this.add.image(px, py, texKey).setScale(scale);
+          img.setDepth(py + 0.3);
+          this.decorGroup.add(img);
+          break;
+        }
+      }
+    }
   }
 
   // ─── Obstacles ────────────────────────────────────────────────────────────
@@ -413,6 +461,7 @@ export class MainScene extends Phaser.Scene {
 
     this.placeTrees(config.numTrees);
     this.placeObstacles(config.obstacleDensity, protectedTiles);
+    this.placeDecorations(this.currentZone, protectedTiles);
     this.spawnEnemies(config.enemySpawns);
     this.spawnInitialItems(config.heartSpawns);
     if (config.hazardSpawns) this.spawnHazards(config.hazardSpawns);
@@ -466,6 +515,7 @@ export class MainScene extends Phaser.Scene {
     this.transitionZones.length = 0;
 
     this.treeGroup.clear(true, true);
+    this.decorGroup.clear(true, true);
     this.obstacles.clear(true, true);
     this.treeObstacles.clear(true, true);
     this.hazardGroup.clear(true, true);

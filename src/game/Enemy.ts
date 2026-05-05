@@ -14,8 +14,10 @@ type EnemyState = 'PATROL' | 'CHASE';
 export type PatrolAxis = 'x' | 'y';
 export type EnemyType = 'basic' | 'ranger' | 'shielder' | 'speedrunner';
 
+const ENEMY_SPRITE_SCALE = 0.095; // 256px frame → ~24px visual
+
 export class Enemy extends Phaser.GameObjects.Container {
-  private sprite: Phaser.GameObjects.Image;
+  private sprite: Phaser.GameObjects.Sprite | Phaser.GameObjects.Image;
   private shadow: Phaser.GameObjects.Image;
   private alertBubble: Phaser.GameObjects.Graphics;
 
@@ -51,13 +53,26 @@ export class Enemy extends Phaser.GameObjects.Container {
 
     this.ensureTextures(scene);
 
-    const textureKey = type === 'ranger' ? 'enemy-ranger'
+    // Real sprite keys for each type (loaded in LoadingScene)
+    const realSpriteKey = type === 'shielder' ? 'enemy-orc'
+      : type === 'speedrunner' ? 'enemy-rat'
+      : type === 'basic' ? 'enemy-goblin'
+      : null;
+
+    const fallbackKey = type === 'ranger' ? 'enemy-ranger'
       : type === 'shielder' ? 'enemy-shielder'
       : type === 'speedrunner' ? 'enemy-speedrunner'
       : 'enemy';
 
     this.shadow = scene.add.image(0, 9, 'shadow').setAlpha(0.38).setScale(0.8);
-    this.sprite = scene.add.image(0, 0, textureKey);
+
+    if (realSpriteKey && scene.textures.exists(realSpriteKey)) {
+      const spr = scene.add.sprite(0, 0, realSpriteKey, 0).setScale(ENEMY_SPRITE_SCALE);
+      if (scene.anims.exists(`${realSpriteKey}-idle`)) spr.play(`${realSpriteKey}-idle`);
+      this.sprite = spr;
+    } else {
+      this.sprite = scene.add.image(0, 0, fallbackKey);
+    }
     this.alertBubble = scene.add.graphics();
     this.shieldGfx = scene.add.graphics();
 

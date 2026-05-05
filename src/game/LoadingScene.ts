@@ -39,6 +39,25 @@ export class LoadingScene extends Phaser.Scene {
         frameHeight: 256,
       });
     }
+
+    // Enemy sprites (4×4 grid, 256px frames, RGBA)
+    const enemySprites = ['enemy-goblin', 'enemy-orc', 'enemy-rat'];
+    for (const key of enemySprites) {
+      this.load.spritesheet(key, `assets/${key}.png`, {
+        frameWidth: 256,
+        frameHeight: 256,
+      });
+    }
+
+    // World decorations (individual RGBA images)
+    const decors = [
+      'decor-tree', 'decor-rock', 'decor-log', 'decor-stump',
+      'decor-bush', 'decor-bush-yellow', 'decor-bush-berry', 'decor-bush-flower',
+      'decor-dungeon-gate', 'decor-dungeon-wall',
+    ];
+    for (const key of decors) {
+      this.load.image(key, `assets/${key}.png`);
+    }
   }
 
   create(): void {
@@ -83,6 +102,13 @@ export class LoadingScene extends Phaser.Scene {
       frameRate: 1,
       repeat: -1,
     });
+
+    // Enemy sprites — static frame 0
+    for (const key of ['enemy-goblin', 'enemy-orc', 'enemy-rat']) {
+      if (this.textures.exists(key)) {
+        this.anims.create({ key: `${key}-idle`, frames: [{ key, frame: 0 }], frameRate: 1, repeat: -1 });
+      }
+    }
 
     // All new NPC types — single static idle frame (frame 0 = front-facing)
     const npcKeys = [
