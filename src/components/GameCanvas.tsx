@@ -257,7 +257,7 @@ export function GameCanvas() {
         level={level}
         nextLevelXp={nextLevelXp}
         minimapData={minimapData}
-        showHints={settings.showHints}
+        showHints={settings.showHints && !settings.showTouchControls}
         showTouchControls={settings.showTouchControls}
         shieldCharges={shieldCharges}
         bossHp={bossHp}

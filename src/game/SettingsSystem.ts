@@ -18,10 +18,14 @@ export const SettingsSystem = {
       if (!raw) return getDefaults();
       const p = JSON.parse(raw) as Partial<Settings>;
       const d = getDefaults();
+      const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
       return {
-        volume:            p.volume            ?? d.volume,
-        showHints:         p.showHints         ?? d.showHints,
-        showTouchControls: p.showTouchControls ?? d.showTouchControls,
+        volume:    p.volume    ?? d.volume,
+        showHints: p.showHints ?? d.showHints,
+        // On touch devices always default to true unless the user explicitly turned it off
+        showTouchControls: isTouch
+          ? (p.showTouchControls ?? true)
+          : (p.showTouchControls ?? false),
       };
     } catch {
       return getDefaults();
