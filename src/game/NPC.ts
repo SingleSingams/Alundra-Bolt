@@ -10,7 +10,8 @@ export interface NPCDefinition {
   y: number;
   portrait?: string;
   portraitColumns?: number;
-  tint?: number; // hex color applied to sprite, e.g. 0x90ee90 for green tint
+  spriteKey?: string; // e.g. 'npc-woman-adventurer' — overrides default elder sprite
+  tint?: number;
 }
 
 export class NPC extends Phaser.GameObjects.Container {
@@ -35,12 +36,20 @@ export class NPC extends Phaser.GameObjects.Container {
     this.portrait = def.portrait;
     this.portraitColumns = def.portraitColumns;
 
-    const useSprite = scene.textures.exists('npc-elder');
     this.shadow = scene.add.image(0, 14, 'shadow').setAlpha(0.45).setScale(1.4, 0.45);
 
-    if (useSprite) {
-      this.sprite = scene.add.sprite(0, 0, 'npc-elder', 0).setScale(NPC_SCALE);
-      this.sprite.play('elder-idle');
+    const customKey = def.spriteKey && scene.textures.exists(def.spriteKey) ? def.spriteKey : null;
+    const elderKey = scene.textures.exists('npc-elder') ? 'npc-elder' : null;
+    const spriteKey = customKey ?? elderKey;
+
+    if (spriteKey) {
+      this.sprite = scene.add.sprite(0, 0, spriteKey, 0).setScale(NPC_SCALE);
+      const animKey = `${spriteKey}-idle`;
+      if (scene.anims.exists(animKey)) {
+        this.sprite.play(animKey);
+      } else {
+        this.sprite.play('elder-idle');
+      }
     } else {
       NPC.ensureTextures(scene);
       this.sprite = scene.add.sprite(0, 0, 'npc').setScale(1);

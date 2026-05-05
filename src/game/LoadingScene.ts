@@ -23,6 +23,22 @@ export class LoadingScene extends Phaser.Scene {
       frameWidth: 256,
       frameHeight: 256,
     });
+
+    // NPC character sprites (4×4 grid, 256px frames, RGBA)
+    const npcSprites = [
+      'npc-woman-adventurer',
+      'npc-elder-woman',
+      'npc-old-explorer',
+      'npc-old-pilgrim',
+      'npc-young-man',
+      'npc-innkeeper-woman',
+    ];
+    for (const key of npcSprites) {
+      this.load.spritesheet(key, `assets/${key}.png`, {
+        frameWidth: 256,
+        frameHeight: 256,
+      });
+    }
   }
 
   create(): void {
@@ -60,12 +76,33 @@ export class LoadingScene extends Phaser.Scene {
       repeat: 0,
     });
 
+    // fallback elder (original sprite)
     this.anims.create({
       key: 'elder-idle',
       frames: [{ key: 'npc-elder', frame: 0 }],
       frameRate: 1,
       repeat: -1,
     });
+
+    // All new NPC types — single static idle frame (frame 0 = front-facing)
+    const npcKeys = [
+      'npc-woman-adventurer',
+      'npc-elder-woman',
+      'npc-old-explorer',
+      'npc-old-pilgrim',
+      'npc-young-man',
+      'npc-innkeeper-woman',
+    ];
+    for (const key of npcKeys) {
+      if (this.textures.exists(key)) {
+        this.anims.create({
+          key: `${key}-idle`,
+          frames: [{ key, frame: 0 }],
+          frameRate: 1,
+          repeat: -1,
+        });
+      }
+    }
 
     createGrassTileset(this);
     this.progress(0.2);
