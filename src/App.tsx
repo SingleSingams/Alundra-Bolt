@@ -3,7 +3,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 
 export default function App() {
   return (
-    <div className="w-screen h-screen bg-stone-950 overflow-hidden" style={{ touchAction: 'none' }}>
+    <div className="fixed inset-0 bg-stone-950 overflow-hidden" style={{ touchAction: 'none' }}>
       <ErrorBoundary>
         <GameCanvas />
       </ErrorBoundary>
