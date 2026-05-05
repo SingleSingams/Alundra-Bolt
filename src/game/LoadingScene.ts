@@ -31,8 +31,7 @@ export class LoadingScene extends Phaser.Scene {
     NPC.ensureTextures(this);
     this.progress(0.85);
 
-    // Minimum display time for the loading screen to feel intentional
-    this.time.delayedCall(500, () => {
+    this.time.delayedCall(200, () => {
       this.progress(1);
       this.time.delayedCall(200, () => {
         this.game.events.emit(GAME_EVENTS.LOADING_COMPLETE);

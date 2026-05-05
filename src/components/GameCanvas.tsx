@@ -102,6 +102,13 @@ export function GameCanvas() {
   const handleLoadProgress = useCallback((v: number) => setLoadProgress(v), []);
   const handleLoadComplete = useCallback(() => setLoaded(true), []);
 
+  // Safety: dismiss loading screen after 5 s even if LOADING_COMPLETE never fires
+  useEffect(() => {
+    if (!gameStarted || loaded) return;
+    const id = setTimeout(() => setLoaded(true), 5000);
+    return () => clearTimeout(id);
+  }, [gameStarted, loaded]);
+
   const handleShieldChange = useCallback((charges: number) => setShieldCharges(charges), []);
   const handleBossHp = useCallback(
     (data: { hp: number; maxHp: number; phase: number }) =>
@@ -290,7 +297,7 @@ export function GameCanvas() {
       />
       <GameOverScreen isOpen={gameOver} level={level} xp={xp} zone={zone} />
       <VictoryScreen isOpen={victory !== null} level={level} xp={xp} ngPlus={victory?.ngPlus ?? 0} />
-      {!loaded && <LoadingScreen progress={loadProgress} />}
+      {gameStarted && !loaded && <LoadingScreen progress={loadProgress} />}
       {skillChoice && (
         <SkillChoiceScreen
           level={skillChoice.level}
