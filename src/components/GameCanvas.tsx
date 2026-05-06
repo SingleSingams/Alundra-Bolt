@@ -12,6 +12,7 @@ import {
   LevelUpSkill,
   LevelUpChoice,
   QuestState,
+  ShopItem,
 } from '../game/constants';
 import { SoundSystem } from '../game/SoundSystem';
 import { SettingsSystem, Settings } from '../game/SettingsSystem';
@@ -25,6 +26,7 @@ import { LoadingScreen } from './LoadingScreen';
 import { SkillChoiceScreen } from './SkillChoiceScreen';
 import { MainMenuScreen } from './MainMenuScreen';
 import { VictoryScreen } from './VictoryScreen';
+import { ShopScreen } from './ShopScreen';
 
 export function GameCanvas() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -49,6 +51,7 @@ export function GameCanvas() {
   const [combo, setCombo] = useState(0);
   const [quest, setQuest] = useState<QuestState | null>(null);
   const [questCompleteNotice, setQuestCompleteNotice] = useState<string | null>(null);
+  const [shop, setShop] = useState<{ npcName: string; items: ShopItem[]; xp: number } | null>(null);
   const [settings, setSettings] = useState<Settings>(() => SettingsSystem.load());
   const [loadProgress, setLoadProgress] = useState(0);
   const [loaded, setLoaded] = useState(false);
@@ -138,6 +141,19 @@ export function GameCanvas() {
     gameRef.current?.events.emit(GAME_EVENTS.DIALOG_CLOSE);
   }, []);
 
+  const handleShopOpen = useCallback((data: { npcName: string; items: ShopItem[]; xp: number }) => {
+    setShop(data);
+  }, []);
+
+  const handleShopBuy = useCallback((itemId: string) => {
+    gameRef.current?.events.emit(GAME_EVENTS.SHOP_BUY, itemId);
+  }, []);
+
+  const handleShopClose = useCallback(() => {
+    setShop(null);
+    gameRef.current?.events.emit(GAME_EVENTS.SHOP_CLOSE);
+  }, []);
+
   const handleNewGame = useCallback((slot: number) => {
     SaveSystem.setSlot(slot);
     SaveSystem.clear();
@@ -176,6 +192,7 @@ export function GameCanvas() {
     game.events.on(GAME_EVENTS.COMBO_CHANGE, handleComboChange);
     game.events.on(GAME_EVENTS.QUEST_UPDATE, handleQuestUpdate);
     game.events.on(GAME_EVENTS.QUEST_COMPLETE, handleQuestComplete);
+    game.events.on(GAME_EVENTS.SHOP_OPEN, handleShopOpen);
 
     return () => {
       game.events.off(GAME_EVENTS.HP_CHANGE, handleHpChange);
@@ -198,6 +215,7 @@ export function GameCanvas() {
       game.events.off(GAME_EVENTS.COMBO_CHANGE, handleComboChange);
       game.events.off(GAME_EVENTS.QUEST_UPDATE, handleQuestUpdate);
       game.events.off(GAME_EVENTS.QUEST_COMPLETE, handleQuestComplete);
+      game.events.off(GAME_EVENTS.SHOP_OPEN, handleShopOpen);
       game.destroy(true);
       gameRef.current = null;
     };
@@ -323,6 +341,14 @@ export function GameCanvas() {
       />
       <GameOverScreen isOpen={gameOver} level={level} xp={xp} zone={zone} />
       <VictoryScreen isOpen={victory !== null} level={level} xp={xp} ngPlus={victory?.ngPlus ?? 0} />
+      <ShopScreen
+        isOpen={shop !== null}
+        npcName={shop?.npcName ?? ''}
+        items={shop?.items ?? []}
+        xp={shop?.xp ?? 0}
+        onBuy={handleShopBuy}
+        onClose={handleShopClose}
+      />
       {gameStarted && !loaded && <LoadingScreen progress={loadProgress} />}
       {skillChoice && (
         <SkillChoiceScreen

@@ -13,6 +13,7 @@ import {
   POTION_HEAL_AMOUNT,
   MAX_HP,
   CHEST_INTERACT_RADIUS,
+  SHOP_ITEMS,
 } from './constants';
 
 const NPC_INTERACT_RADIUS = 42;
@@ -28,6 +29,7 @@ export interface InteractionCallbacks {
   isEnhancedPotions(): boolean;
   emitInventoryChange(): void;
   getCurrentZone(): ZoneId;
+  getXp(): number;
 }
 
 export class InteractionManager {
@@ -132,6 +134,10 @@ export class InteractionManager {
 
   openDialog(npc: NPC): void {
     this.player.setDialogActive(true);
+    if (npc.isShop) {
+      this.game.events.emit(GAME_EVENTS.SHOP_OPEN, { npcName: npc.npcName, items: SHOP_ITEMS, xp: this.cb.getXp() });
+      return;
+    }
     const payload: DialogPayload = {
       npcName: npc.npcName,
       lines: npc.lines,

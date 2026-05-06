@@ -87,10 +87,9 @@ export const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
         portrait: 'assets/portraits/explorer.png',
         x: cx + 160,
         y: cy + 30,
+        isShop: true,
         lines: [
-          'Guten Tag! Aldrics Markt — alles was das Abenteurer-Herz begehrt!',
-          'Leider... verkaufe ich gerade nichts. Die Lieferungen kommen nicht mehr durch den Wald.',
-          'Wenn du dort nach dem Rechten siehst, wäre ich dir sehr dankbar.',
+          'Eure Entschlossenheit hat mein Lager aufgetaut. Was braucht Ihr?',
         ],
       },
     ],

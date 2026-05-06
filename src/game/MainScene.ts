@@ -46,6 +46,10 @@ import {
   NG_PLUS_DAMAGE_MULT,
   SKILL_SYNERGIES,
   QuestState,
+  ShopItemId,
+  SHOP_ITEMS,
+  HEART_HEAL_AMOUNT,
+  POTION_HEAL_AMOUNT,
 } from './constants';
 import { SaveSystem } from './SaveSystem';
 import { Boss } from './Boss';
@@ -177,6 +181,7 @@ export class MainScene extends Phaser.Scene {
         isEnhancedPotions: () => this.enhancedPotions,
         emitInventoryChange: () => this.emitInventoryChange(),
         getCurrentZone: () => this.currentZone,
+        getXp: () => this.xp,
       },
     );
 
@@ -237,6 +242,8 @@ export class MainScene extends Phaser.Scene {
     this.game.events.on(GAME_EVENTS.PLAYER_ATTACK, () => SoundSystem.playAttack(), this);
     this.game.events.on(GAME_EVENTS.USE_POTION, () => this.interactionMgr.handleUsePotion(), this);
     this.game.events.on(GAME_EVENTS.LEVEL_UP_CHOSEN, this.handleSkillChosen, this);
+    this.game.events.on(GAME_EVENTS.SHOP_BUY, this.handleShopBuy, this);
+    this.game.events.on(GAME_EVENTS.SHOP_CLOSE, () => this.interactionMgr.closeDialog(), this);
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off(GAME_EVENTS.DIALOG_CLOSE, undefined, this);
@@ -245,6 +252,8 @@ export class MainScene extends Phaser.Scene {
       this.game.events.off(GAME_EVENTS.PLAYER_ATTACK, undefined, this);
       this.game.events.off(GAME_EVENTS.USE_POTION, undefined, this);
       this.game.events.off(GAME_EVENTS.LEVEL_UP_CHOSEN, this.handleSkillChosen, this);
+      this.game.events.off(GAME_EVENTS.SHOP_BUY, this.handleShopBuy, this);
+      this.game.events.off(GAME_EVENTS.SHOP_CLOSE, undefined, this);
     });
   }
 
@@ -835,6 +844,22 @@ export class MainScene extends Phaser.Scene {
     const choices = allSkills.sort(() => Math.random() - 0.5).slice(0, 3);
     this.scene.pause();
     this.game.events.emit(GAME_EVENTS.LEVEL_UP_CHOICE, { skills: choices, chosen: [...this.chosenSkills] });
+  }
+
+  private handleShopBuy(itemId: ShopItemId): void {
+    const item = SHOP_ITEMS.find(i => i.id === itemId);
+    if (!item || this.xp < item.xpCost) return;
+    this.xp -= item.xpCost;
+    this.game.events.emit(GAME_EVENTS.XP_CHANGE, { xp: this.xp, level: this.level, nextLevelXp: XP_THRESHOLDS[this.level - 1] ?? null });
+    switch (itemId) {
+      case 'heart':              this.player.heal(HEART_HEAL_AMOUNT); SoundSystem.playHeal(); break;
+      case 'heal_potion':        this.player.heal(POTION_HEAL_AMOUNT); SoundSystem.playHeal(); break;
+      case 'shield_charge':      this.player.addShield(); break;
+      case 'projectile_upgrade': this.currentProjectileDamage += 1; break;
+    }
+    this.juice.spawnParticleBurst(this.player.x, this.player.y, 0xfde68a, 8, 50, 350);
+    this.saveCurrentState();
+    this.game.events.emit(GAME_EVENTS.SHOP_OPEN, { npcName: 'Händler Aldric', items: SHOP_ITEMS, xp: this.xp });
   }
 
   private handleSkillChosen(skill: LevelUpSkill): void {

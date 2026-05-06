@@ -12,6 +12,7 @@ export interface NPCDefinition {
   portraitColumns?: number;
   spriteKey?: string; // e.g. 'npc-woman-adventurer' — overrides default elder sprite
   tint?: number;
+  isShop?: boolean;
 }
 
 export class NPC extends Phaser.GameObjects.Container {
@@ -20,6 +21,7 @@ export class NPC extends Phaser.GameObjects.Container {
   public readonly lines: string[];
   public readonly portrait?: string;
   public readonly portraitColumns?: number;
+  public readonly isShop: boolean;
 
   private sprite: Phaser.GameObjects.Sprite;
   private shadow: Phaser.GameObjects.Image;
@@ -35,6 +37,7 @@ export class NPC extends Phaser.GameObjects.Container {
     this.lines = def.lines;
     this.portrait = def.portrait;
     this.portraitColumns = def.portraitColumns;
+    this.isShop = def.isShop ?? false;
 
     this.shadow = scene.add.image(0, 14, 'shadow').setAlpha(0.45).setScale(1.4, 0.45);
 

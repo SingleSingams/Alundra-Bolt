@@ -90,7 +90,27 @@ export const GAME_EVENTS = {
   COMBO_CHANGE: 'combo-change',
   QUEST_UPDATE: 'quest-update',
   QUEST_COMPLETE: 'quest-complete',
+  SHOP_OPEN: 'shop-open',
+  SHOP_BUY: 'shop-buy',
+  SHOP_CLOSE: 'shop-close',
 } as const;
+
+export type ShopItemId = 'heal_potion' | 'shield_charge' | 'heart' | 'projectile_upgrade';
+
+export interface ShopItem {
+  id: ShopItemId;
+  label: string;
+  desc: string;
+  xpCost: number;
+  icon: string;
+}
+
+export const SHOP_ITEMS: ShopItem[] = [
+  { id: 'heart',             label: 'Herz-Trank',        desc: '+2 HP sofort',             xpCost: 5,  icon: '❤️' },
+  { id: 'heal_potion',       label: 'Heiltrank',          desc: '+4 HP sofort',             xpCost: 8,  icon: '🧪' },
+  { id: 'shield_charge',     label: 'Schild-Ladung',      desc: '+1 Schild-Ladung',         xpCost: 12, icon: '🛡️' },
+  { id: 'projectile_upgrade',label: 'Projektilstärke',   desc: '+1 Projektilschaden',      xpCost: 20, icon: '⚡' },
+];
 
 export const NG_PLUS_HP_MULT = 1.5;
 export const NG_PLUS_DAMAGE_MULT = 1.25;
