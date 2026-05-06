@@ -14,6 +14,9 @@ const FULL_SAVE = {
   ngPlus: 0,
   chosenSkills: [] as import('../constants').LevelUpSkill[],
   openedSecrets: [] as string[],
+  questKills: 0,
+  questShieldFound: false,
+  questBossKilled: false,
 };
 
 describe('SaveSystem', () => {

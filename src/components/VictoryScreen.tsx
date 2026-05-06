@@ -23,6 +23,9 @@ export function VictoryScreen({ isOpen, level, xp, ngPlus }: Props) {
       ngPlus: ngPlus + 1,
       chosenSkills: [],
       openedSecrets: [],
+      questKills: 0,
+      questShieldFound: false,
+      questBossKilled: false,
     });
     window.location.reload();
   };

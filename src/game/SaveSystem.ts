@@ -11,6 +11,9 @@ export interface SaveData {
   ngPlus: number;
   chosenSkills: LevelUpSkill[];
   openedSecrets: string[];
+  questKills: number;
+  questShieldFound: boolean;
+  questBossKilled: boolean;
 }
 
 export interface SlotPreview {
@@ -37,6 +40,9 @@ const defaults: SaveData = {
   ngPlus: 0,
   chosenSkills: [],
   openedSecrets: [],
+  questKills: 0,
+  questShieldFound: false,
+  questBossKilled: false,
 };
 
 function parseSlot(slot: number): SaveData | null {
@@ -55,6 +61,9 @@ function parseSlot(slot: number): SaveData | null {
       ngPlus: p.ngPlus ?? defaults.ngPlus,
       chosenSkills: (p as Partial<SaveData>).chosenSkills ?? defaults.chosenSkills,
       openedSecrets: (p as Partial<SaveData>).openedSecrets ?? defaults.openedSecrets,
+      questKills: p.questKills ?? defaults.questKills,
+      questShieldFound: p.questShieldFound ?? defaults.questShieldFound,
+      questBossKilled: p.questBossKilled ?? defaults.questBossKilled,
     };
   } catch {
     return null;

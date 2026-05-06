@@ -255,8 +255,8 @@ export const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
       { tx: 46, ty: 14, axis: 'y', type: 'speedrunner' },
       { tx: 14, ty: 46, axis: 'y', type: 'shielder' },
       { tx: 46, ty: 46, axis: 'x', type: 'shielder' },
-      { tx: 10, ty: 30, axis: 'y', type: 'dragon' },
-      { tx: 50, ty: 30, axis: 'x', type: 'dragon' },
+      { tx: 10, ty: 30, axis: 'y', type: 'dragon-red' },
+      { tx: 50, ty: 30, axis: 'x', type: 'dragon-red' },
     ],
     heartSpawns: [],
     hazardSpawns: [

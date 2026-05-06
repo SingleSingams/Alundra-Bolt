@@ -12,7 +12,7 @@ const RANGER_SHOOT_INTERVAL = 2000;
 
 type EnemyState = 'PATROL' | 'CHASE';
 export type PatrolAxis = 'x' | 'y';
-export type EnemyType = 'basic' | 'ranger' | 'shielder' | 'speedrunner' | 'dragon';
+export type EnemyType = 'basic' | 'ranger' | 'shielder' | 'speedrunner' | 'dragon' | 'dragon-red';
 
 const ENEMY_SPRITE_SCALE = 0.095; // 256px frame → ~24px visual
 
@@ -49,13 +49,13 @@ export class Enemy extends Phaser.GameObjects.Container {
     this.maxHp = Math.round(ENEMY_MAX_HP * ENEMY_HP_SCALE[idx] * hpMult);
     this.hp = this.maxHp;
     this.contactDamage = Math.round(ENEMY_DAMAGE_SCALE[idx] * damageMult);
-    if (type === 'dragon') {
-      this.maxHp = Math.round(6 * hpMult);
+    if (type === 'dragon' || type === 'dragon-red') {
+      this.maxHp = Math.round((type === 'dragon-red' ? 8 : 6) * hpMult);
       this.hp = this.maxHp;
-      this.contactDamage = Math.round(3 * damageMult);
+      this.contactDamage = Math.round((type === 'dragon-red' ? 4 : 3) * damageMult);
     }
     this.chaseSpeed = type === 'speedrunner' ? ENEMY_SPEED * 2.1
-      : type === 'dragon' ? ENEMY_SPEED * 0.7
+      : type === 'dragon' || type === 'dragon-red' ? ENEMY_SPEED * 0.7
       : ENEMY_SPEED;
 
     this.ensureTextures(scene);
@@ -65,18 +65,19 @@ export class Enemy extends Phaser.GameObjects.Container {
       : type === 'speedrunner' ? 'enemy-rat'
       : type === 'basic' ? 'enemy-goblin'
       : type === 'dragon' ? 'enemy-dark-dragon'
+      : type === 'dragon-red' ? 'enemy-red-dragon'
       : null;
 
     const fallbackKey = type === 'ranger' ? 'enemy-ranger'
       : type === 'shielder' ? 'enemy-shielder'
       : type === 'speedrunner' ? 'enemy-speedrunner'
-      : type === 'dragon' ? 'enemy'
+      : (type === 'dragon' || type === 'dragon-red') ? 'enemy'
       : 'enemy';
 
     this.shadow = scene.add.image(0, 9, 'shadow').setAlpha(0.38).setScale(0.8);
 
     if (realSpriteKey && scene.textures.exists(realSpriteKey)) {
-      const spriteScale = type === 'dragon' ? ENEMY_SPRITE_SCALE * 1.35 : ENEMY_SPRITE_SCALE;
+      const spriteScale = (type === 'dragon' || type === 'dragon-red') ? ENEMY_SPRITE_SCALE * 1.35 : ENEMY_SPRITE_SCALE;
       const spr = scene.add.sprite(0, 0, realSpriteKey, 0).setScale(spriteScale);
       if (scene.anims.exists(`${realSpriteKey}-idle`)) spr.play(`${realSpriteKey}-idle`);
       this.sprite = spr;

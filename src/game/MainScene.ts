@@ -163,6 +163,9 @@ export class MainScene extends Phaser.Scene {
       this.killedEnemyIds = new Set(save.killedEnemies ?? []);
       this.chosenSkills = save.chosenSkills ?? [];
       this.openedSecrets = new Set(save.openedSecrets ?? []);
+      this.questKills = save.questKills ?? 0;
+      this.questShieldFound = save.questShieldFound ?? false;
+      this.questBossKilled = save.questBossKilled ?? false;
       this.recalculateAttackDamage();
       this.checkSynergies();
       this.emitInventoryChange();
@@ -736,6 +739,7 @@ export class MainScene extends Phaser.Scene {
     if (!this.questBossKilled) {
       this.questBossKilled = true;
       this.emitQuestState();
+      this.game.events.emit(GAME_EVENTS.QUEST_COMPLETE, 'Tyrann besiegt!');
     }
     this.cameras.main.shake(500, 0.022);
     this.juice.spawnParticleBurst(x, y, 0xef4444, 24, 110, 700);
@@ -943,6 +947,9 @@ export class MainScene extends Phaser.Scene {
     if (this.questKills < 5) {
       this.questKills++;
       this.emitQuestState();
+      if (this.questKills === 5) {
+        this.game.events.emit(GAME_EVENTS.QUEST_COMPLETE, '5 Feinde besiegt!');
+      }
     }
   }
 
@@ -1117,6 +1124,9 @@ export class MainScene extends Phaser.Scene {
       ngPlus: this.ngPlus,
       chosenSkills: [...this.chosenSkills],
       openedSecrets: [...this.openedSecrets],
+      questKills: this.questKills,
+      questShieldFound: this.questShieldFound,
+      questBossKilled: this.questBossKilled,
     });
   }
 
@@ -1307,6 +1317,7 @@ export class MainScene extends Phaser.Scene {
       if (!this.questShieldFound) {
         this.questShieldFound = true;
         this.emitQuestState();
+        this.game.events.emit(GAME_EVENTS.QUEST_COMPLETE, 'Schild-Fragment gefunden!');
       }
     }
     if (reward === 'projectile_upgrade') this.currentProjectileDamage++;

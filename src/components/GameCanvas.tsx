@@ -48,6 +48,7 @@ export function GameCanvas() {
   const [victory, setVictory] = useState<{ ngPlus: number } | null>(null);
   const [combo, setCombo] = useState(0);
   const [quest, setQuest] = useState<QuestState | null>(null);
+  const [questCompleteNotice, setQuestCompleteNotice] = useState<string | null>(null);
   const [settings, setSettings] = useState<Settings>(() => SettingsSystem.load());
   const [loadProgress, setLoadProgress] = useState(0);
   const [loaded, setLoaded] = useState(false);
@@ -85,6 +86,10 @@ export function GameCanvas() {
   const handleVictory = useCallback((data: { ngPlus: number }) => setVictory(data), []);
   const handleComboChange = useCallback((c: number) => setCombo(c), []);
   const handleQuestUpdate = useCallback((q: QuestState | null) => setQuest(q), []);
+  const handleQuestComplete = useCallback((label: string) => {
+    setQuestCompleteNotice(label);
+    setTimeout(() => setQuestCompleteNotice(null), 2800);
+  }, []);
   const handleXpChange = useCallback(
     (data: { xp: number; level: number; nextLevelXp: number | null }) => {
       setXp(data.xp);
@@ -170,6 +175,7 @@ export function GameCanvas() {
     game.events.on(GAME_EVENTS.VICTORY, handleVictory);
     game.events.on(GAME_EVENTS.COMBO_CHANGE, handleComboChange);
     game.events.on(GAME_EVENTS.QUEST_UPDATE, handleQuestUpdate);
+    game.events.on(GAME_EVENTS.QUEST_COMPLETE, handleQuestComplete);
 
     return () => {
       game.events.off(GAME_EVENTS.HP_CHANGE, handleHpChange);
@@ -191,6 +197,7 @@ export function GameCanvas() {
       game.events.off(GAME_EVENTS.VICTORY, handleVictory);
       game.events.off(GAME_EVENTS.COMBO_CHANGE, handleComboChange);
       game.events.off(GAME_EVENTS.QUEST_UPDATE, handleQuestUpdate);
+      game.events.off(GAME_EVENTS.QUEST_COMPLETE, handleQuestComplete);
       game.destroy(true);
       gameRef.current = null;
     };
@@ -214,6 +221,7 @@ export function GameCanvas() {
     handleVictory,
     handleComboChange,
     handleQuestUpdate,
+    handleQuestComplete,
     gameStarted,
   ]);
 
@@ -294,6 +302,15 @@ export function GameCanvas() {
           bg-stone-900/80 border border-amber-600/60 text-amber-300 text-xs font-mono
           px-4 py-2 rounded shadow-lg animate-fade-in">
           Spielstand geladen
+        </div>
+      )}
+      {questCompleteNotice && (
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-50 text-center">
+          <div className="bg-emerald-900/85 border-2 border-emerald-400/80 text-emerald-100 font-bold
+            px-5 py-2 rounded-xl shadow-2xl shadow-emerald-900/50">
+            <div className="text-xs tracking-widest uppercase text-emerald-400 mb-0.5">Aufgabe erfüllt!</div>
+            <div className="text-sm font-semibold">{questCompleteNotice}</div>
+          </div>
         </div>
       )}
       <DialogBox

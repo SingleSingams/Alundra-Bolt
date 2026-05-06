@@ -72,6 +72,7 @@ export const GAME_EVENTS = {
   VICTORY: 'victory',
   COMBO_CHANGE: 'combo-change',
   QUEST_UPDATE: 'quest-update',
+  QUEST_COMPLETE: 'quest-complete',
 } as const;
 
 export const NG_PLUS_HP_MULT = 1.5;
