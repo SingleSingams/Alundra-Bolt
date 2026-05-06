@@ -25,12 +25,9 @@ import {
   ATTACK_DAMAGE,
   PROJECTILE_DAMAGE,
   CHEST_DROP_CHANCE,
-  CHEST_INTERACT_RADIUS,
-  HEART_HEAL_AMOUNT,
   MAX_HP,
   HAZARD_DAMAGE_INTERVAL,
   MAX_INVENTORY,
-  POTION_HEAL_AMOUNT,
   InventoryItem,
   ZoneId,
   ZONES,
@@ -54,17 +51,24 @@ import { Projectile } from './Projectile';
 import { SoundSystem } from './SoundSystem';
 import { HapticSystem } from './HapticSystem';
 import { ZONE_CONFIGS, ZoneConfig, EdgeDirection } from './ZoneConfigs';
+import {
+  placeTrees,
+  placeVillage,
+  placeDecorations,
+  placeObstacles,
+  placeCampfire,
+  spawnHazards,
+  spawnSecretWall,
+} from './WorldBuilder';
+import { InteractionManager } from './InteractionManager';
 
 const centerX = WORLD_WIDTH / 2;
 const centerY = WORLD_HEIGHT / 2;
 
-const TREE_POSITIONS: Array<{ x: number; y: number }> = [];
-const SPAWN_SAFE_TILES = 6;
 const DIRECTION_ANGLES: Record<string, number> = {
   n: -90, ne: -45, e: 0, se: 45,
   s: 90, sw: 135, w: 180, nw: -135,
 };
-const NPC_INTERACT_RADIUS = 42;
 const TRANSITION_ZONE_THICKNESS = TRANSITION_EDGE_TILES * TILE_SIZE;
 
 export class MainScene extends Phaser.Scene {
@@ -83,8 +87,6 @@ export class MainScene extends Phaser.Scene {
   private hazardCooldown = 0;
 
   private inventory: InventoryItem[] = [];
-  private activeChest: Item | null = null;
-  private activeNpc: NPC | null = null;
   private currentZone: ZoneId = 'grasslands';
   private isTransitioning = false;
   private ambientBreathTime = 0;
@@ -113,6 +115,7 @@ export class MainScene extends Phaser.Scene {
   private questKills = 0;
   private questShieldFound = false;
   private questBossKilled = false;
+  private interactionMgr!: InteractionManager;
 
   constructor() {
     super({ key: 'MainScene' });
@@ -148,6 +151,27 @@ export class MainScene extends Phaser.Scene {
     this.player = new Player(this, centerX, centerY);
     this.setupPersistentColliders();
 
+    this.interactionMgr = new InteractionManager(
+      this.game, this.player, this.items, this.npcs, this.juice,
+      {
+        addToInventory: (item) => this.addToInventory(item),
+        saveCurrentState: () => this.saveCurrentState(),
+        emitQuestState: () => this.emitQuestState(),
+        onShieldQuestFound: () => {
+          if (!this.questShieldFound) {
+            this.questShieldFound = true;
+            this.emitQuestState();
+            this.game.events.emit(GAME_EVENTS.QUEST_COMPLETE, 'Schild-Fragment gefunden!');
+          }
+        },
+        getInventory: () => this.inventory,
+        getProjectileDamage: () => this.currentProjectileDamage,
+        setProjectileDamage: (v) => { this.currentProjectileDamage = v; },
+        isEnhancedPotions: () => this.enhancedPotions,
+        emitInventoryChange: () => this.emitInventoryChange(),
+      },
+    );
+
     const save = SaveSystem.load();
     this.loadZone(save?.zone ?? 'grasslands', null);
 
@@ -181,7 +205,6 @@ export class MainScene extends Phaser.Scene {
         xp: 0, level: 1, nextLevelXp: XP_THRESHOLDS[0],
       });
       this.game.events.emit(GAME_EVENTS.SHIELD_CHANGE, 0);
-      // Show Mira intro dialog for new games
       this.time.delayedCall(900, () => {
         const introPaylod: DialogPayload = {
           npcName: 'Mira die Dorfälteste',
@@ -200,25 +223,19 @@ export class MainScene extends Phaser.Scene {
     this.emitQuestState();
     this.useItemKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E);
 
-    // React → Phaser: dialog close signal
-    this.game.events.on(GAME_EVENTS.DIALOG_CLOSE, this.handleDialogClose, this);
-    // Player damage → particles via game event
+    this.game.events.on(GAME_EVENTS.DIALOG_CLOSE, () => this.interactionMgr.closeDialog(), this);
     this.game.events.on(GAME_EVENTS.PLAYER_DAMAGED, this.onPlayerDamaged, this);
-    // Shield block → blue spark effect
     this.game.events.on(GAME_EVENTS.SHIELD_BLOCK, this.onShieldBlock, this);
-    // Attack sound on every swing
     this.game.events.on(GAME_EVENTS.PLAYER_ATTACK, () => SoundSystem.playAttack(), this);
-    // React → Phaser: use potion from inventory
-    this.game.events.on(GAME_EVENTS.USE_POTION, this.handleUsePotion, this);
-    // React → Phaser: skill chosen at level-up
+    this.game.events.on(GAME_EVENTS.USE_POTION, () => this.interactionMgr.handleUsePotion(), this);
     this.game.events.on(GAME_EVENTS.LEVEL_UP_CHOSEN, this.handleSkillChosen, this);
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      this.game.events.off(GAME_EVENTS.DIALOG_CLOSE, this.handleDialogClose, this);
+      this.game.events.off(GAME_EVENTS.DIALOG_CLOSE, undefined, this);
       this.game.events.off(GAME_EVENTS.PLAYER_DAMAGED, this.onPlayerDamaged, this);
       this.game.events.off(GAME_EVENTS.SHIELD_BLOCK, this.onShieldBlock, this);
       this.game.events.off(GAME_EVENTS.PLAYER_ATTACK, undefined, this);
-      this.game.events.off(GAME_EVENTS.USE_POTION, this.handleUsePotion, this);
+      this.game.events.off(GAME_EVENTS.USE_POTION, undefined, this);
       this.game.events.off(GAME_EVENTS.LEVEL_UP_CHOSEN, this.handleSkillChosen, this);
     });
   }
@@ -227,289 +244,18 @@ export class MainScene extends Phaser.Scene {
 
   private buildTilemap(): void {
     const map = this.make.tilemap({
-      tileWidth: TILE_SIZE,
-      tileHeight: TILE_SIZE,
-      width: MAP_WIDTH,
-      height: MAP_HEIGHT,
+      tileWidth: TILE_SIZE, tileHeight: TILE_SIZE,
+      width: MAP_WIDTH, height: MAP_HEIGHT,
     });
-
     const tileset = map.addTilesetImage('grass-tiles', 'grass-tiles', TILE_SIZE, TILE_SIZE, 0, 0, 0);
     if (!tileset) throw new Error('Failed to add tileset');
-
     const layer = map.createBlankLayer('ground', tileset, 0, 0);
     if (!layer) throw new Error('Failed to create layer');
-
     this.groundLayer = layer;
-
     const weights = [0, 0, 0, 1, 1, 2, 3, 4];
-    for (let y = 0; y < MAP_HEIGHT; y++) {
-      for (let x = 0; x < MAP_WIDTH; x++) {
-        const tileIndex = weights[Math.floor(Math.random() * weights.length)] % TILE_VARIANTS;
-        layer.putTileAt(tileIndex, x, y);
-      }
-    }
-  }
-
-  // ─── Hazards ──────────────────────────────────────────────────────────────
-
-  private spawnHazards(spawns: NonNullable<ZoneConfig['hazardSpawns']>): void {
-    for (const h of spawns) {
-      const px = h.tx * TILE_SIZE + TILE_SIZE / 2;
-      const py = h.ty * TILE_SIZE + TILE_SIZE / 2;
-      const key = h.kind === 'lava' ? 'hazard-lava' : 'hazard-thorns';
-      const tile = this.hazardGroup.create(px, py, key) as Phaser.Physics.Arcade.Image;
-      tile.setDepth(0.5);
-      tile.refreshBody();
-    }
-  }
-
-  // ─── Secret walls ─────────────────────────────────────────────────────────
-
-  private spawnSecretWall(wall: NonNullable<ZoneConfig['secretWall']>): void {
-    const secretId = `${this.currentZone}:${wall.tx},${wall.ty}`;
-    if (this.openedSecrets.has(secretId)) return;
-
-    const px = wall.tx * TILE_SIZE + TILE_SIZE / 2;
-    const py = wall.ty * TILE_SIZE + TILE_SIZE / 2;
-    const img = this.secretWallGroup.create(px, py, 'secret-wall') as Phaser.Physics.Arcade.Image;
-    img.setDepth(py);
-    img.setData('secretId', secretId);
-    img.setData('reward', wall.reward);
-    img.refreshBody();
-  }
-
-  private openSecret(wall: Phaser.Physics.Arcade.Image): void {
-    if (!wall.active) return;
-    const secretId = wall.getData('secretId') as string;
-    const reward = wall.getData('reward') as InventoryItem;
-    if (this.openedSecrets.has(secretId)) return;
-
-    this.openedSecrets.add(secretId);
-    const wx = wall.x;
-    const wy = wall.y;
-
-    this.juice.spawnParticleBurst(wx, wy, 0xfde68a, 18, 85, 550);
-    this.juice.spawnParticleBurst(wx, wy, 0xfbbf24, 12, 55, 400);
-    this.cameras.main.shake(250, 0.008);
-    SoundSystem.playChestOpen();
-
-    wall.destroy();
-    this.applyChestReward(reward);
-    this.saveCurrentState();
-  }
-
-  // ─── Trees ────────────────────────────────────────────────────────────────
-
-  private placeTrees(count: number): void {
-    TREE_POSITIONS.length = 0;
-    const margin = 3;
-
-    for (let i = 0; i < count; i++) {
-      const tx = Phaser.Math.Between(margin, MAP_WIDTH - margin);
-      const ty = Phaser.Math.Between(margin, MAP_HEIGHT - margin);
-      const px = tx * TILE_SIZE + TILE_SIZE / 2;
-      const py = ty * TILE_SIZE + TILE_SIZE / 2;
-
-      if (Math.abs(px - centerX) < 120 && Math.abs(py - centerY) < 120) continue;
-
-      TREE_POSITIONS.push({ x: px, y: py });
-      this.drawTree(px, py);
-    }
-  }
-
-  private drawTree(x: number, y: number): void {
-    if (this.textures.exists('decor-tree')) {
-      // Use real pixel-art tree sprite
-      const shadow = this.add.ellipse(x + 4, y + 22, 52, 16, 0x000000, 0.20);
-      shadow.setDepth(0.1);
-      const tree = this.add.image(x, y - 10, 'decor-tree').setScale(0.30);
-      tree.setDepth(y + 0.5);
-      this.treeGroup.add(shadow);
-      this.treeGroup.add(tree);
-      return;
-    }
-
-    // Fallback procedural tree
-    const shadowGfx = this.add.graphics();
-    shadowGfx.fillStyle(0x000000, 0.2);
-    shadowGfx.fillEllipse(0, 0, 38, 14);
-    const shadowKey = `tree-shadow-${x}-${y}`;
-    if (!this.textures.exists(shadowKey)) shadowGfx.generateTexture(shadowKey, 38, 14);
-    shadowGfx.destroy();
-
-    const canopyGfx = this.add.graphics();
-    canopyGfx.fillStyle(0x2d6a35, 1); canopyGfx.fillCircle(0, 0, 22);
-    canopyGfx.fillStyle(0x3a8044, 1); canopyGfx.fillCircle(-7, -6, 14); canopyGfx.fillCircle(8, -4, 16);
-    const canopyKey = `tree-canopy-${x}-${y}`;
-    if (!this.textures.exists(canopyKey)) canopyGfx.generateTexture(canopyKey, 48, 48);
-    canopyGfx.destroy();
-
-    const shadow = this.add.image(x + 6, y + 10, shadowKey); shadow.setDepth(0.1);
-    const canopy = this.add.image(x, y - 18, canopyKey); canopy.setDepth(y + 0.5);
-    this.treeGroup.add(shadow);
-    this.treeGroup.add(canopy);
-  }
-
-  // ─── Village (grasslands only) ────────────────────────────────────────────
-
-  private placeVillage(): void {
-    if (!this.textures.exists('building-tavern')) return; // assets not loaded yet
-
-    // Ensure tiny blocker texture exists
-    if (!this.textures.exists('_blocker')) {
-      const g = this.add.graphics();
-      g.fillStyle(0xffffff, 0); g.fillRect(0, 0, 2, 2);
-      g.generateTexture('_blocker', 2, 2); g.destroy();
-    }
-
-    // Each entry: [textureKey, offsetX, offsetY, scale, blockerW, blockerH, blockerOffY]
-    const layout: [string, number, number, number, number, number, number][] = [
-      ['building-tavern',     -110, -145, 0.22,  64, 24, 30],
-      ['building-farm',        160, -155, 0.20,  80, 22, 28],
-      ['building-apothecary', -195,   20, 0.21,  72, 22, 26],
-      ['building-market',      155,   30, 0.21,  72, 20, 24],
-      ['building-blacksmith', -200,  165, 0.21,  68, 22, 26],
-      ['building-windmill',      0,  220, 0.22,  52, 22, 30],
-      ['building-watchtower',  205, -215, 0.22,  44, 22, 28],
-    ];
-
-    for (const [key, ox, oy, scale, bw, bh, bOffY] of layout) {
-      if (!this.textures.exists(key)) continue;
-      const x = centerX + ox;
-      const y = centerY + oy;
-
-      // Shadow ellipse under building
-      const frame = this.textures.getFrame(key);
-      const vw = frame.realWidth * scale;
-      const vh = frame.realHeight * scale;
-      const shadow = this.add.ellipse(x, y + vh * 0.48, vw * 0.75, 14, 0x000000, 0.22);
-      shadow.setDepth(y - 1);
-      this.decorGroup.add(shadow);
-
-      // Visual building image
-      const img = this.add.image(x, y, key).setScale(scale);
-      img.setDepth(y + vh * 0.3);
-      this.decorGroup.add(img);
-
-      // Physics blocker at building base (keeps player/NPCs from walking through)
-      const blocker = this.obstacles.create(x, y + bOffY, '_blocker') as Phaser.Physics.Arcade.Image;
-      (blocker.body as Phaser.Physics.Arcade.StaticBody).setSize(bw, bh);
-      blocker.setVisible(false).setAlpha(0);
-      blocker.refreshBody();
-    }
-
-    // Dirt path connecting buildings — drawn under everything
-    const pathGfx = this.add.graphics();
-    pathGfx.fillStyle(0xb8a070, 0.35);
-    // Horizontal main street
-    pathGfx.fillRoundedRect(centerX - 230, centerY - 20, 460, 38, 8);
-    // Vertical lane
-    pathGfx.fillRoundedRect(centerX - 20, centerY - 240, 38, 320, 8);
-    pathGfx.setDepth(0.05);
-  }
-
-  // ─── Decorations (non-blocking world dressing) ────────────────────────────
-
-  private placeDecorations(zone: ZoneId, protectedTiles: Set<string>): void {
-    type DecorSet = { keys: string[]; scale: number; count: number };
-
-    const byZone: Partial<Record<ZoneId, DecorSet[]>> = {
-      grasslands: [
-        { keys: ['decor-bush-yellow', 'decor-bush-berry', 'decor-bush-flower'], scale: 0.28, count: 18 },
-        { keys: ['decor-bush'], scale: 0.26, count: 12 },
-        { keys: ['decor-rock'], scale: 0.22, count: 8 },
-      ],
-      forest: [
-        { keys: ['decor-log', 'decor-stump'], scale: 0.28, count: 14 },
-        { keys: ['decor-bush', 'decor-bush-berry'], scale: 0.26, count: 16 },
-        { keys: ['decor-rock'], scale: 0.22, count: 6 },
-      ],
-      dungeon: [
-        { keys: ['decor-rock'], scale: 0.22, count: 10 },
-        { keys: ['decor-dungeon-wall'], scale: 0.30, count: 5 },
-      ],
-      dungeon_interior: [
-        { keys: ['decor-rock'], scale: 0.20, count: 8 },
-        { keys: ['decor-dungeon-wall'], scale: 0.30, count: 6 },
-      ],
-      boss_room: [
-        { keys: ['decor-dungeon-gate'], scale: 0.32, count: 2 },
-        { keys: ['decor-dungeon-wall'], scale: 0.28, count: 4 },
-      ],
-    };
-
-    const sets = byZone[zone] ?? [];
-    const margin = 3;
-
-    for (const { keys, scale, count } of sets) {
-      for (let i = 0; i < count; i++) {
-        let attempts = 0;
-        while (attempts++ < 20) {
-          const tx = Phaser.Math.Between(margin, MAP_WIDTH - margin);
-          const ty = Phaser.Math.Between(margin, MAP_HEIGHT - margin);
-          const key = `${tx},${ty}`;
-          if (protectedTiles.has(key)) continue;
-          const px = tx * TILE_SIZE + TILE_SIZE / 2;
-          const py = ty * TILE_SIZE + TILE_SIZE / 2;
-          if (Math.abs(px - centerX) < 100 && Math.abs(py - centerY) < 100) continue;
-
-          const texKey = keys[Math.floor(Math.random() * keys.length)];
-          if (!this.textures.exists(texKey)) break;
-
-          const img = this.add.image(px, py, texKey).setScale(scale);
-          img.setDepth(py + 0.3);
-          this.decorGroup.add(img);
-          break;
-        }
-      }
-    }
-  }
-
-  // ─── Obstacles ────────────────────────────────────────────────────────────
-
-  private placeObstacles(density: number, protectedTiles: Set<string>): void {
-    const centerTX = Math.floor(MAP_WIDTH / 2);
-    const centerTY = Math.floor(MAP_HEIGHT / 2);
-
-    const treeTiles = new Set<string>();
-    for (const pos of TREE_POSITIONS) {
-      const tx = Math.floor(pos.x / TILE_SIZE);
-      const ty = Math.floor(pos.y / TILE_SIZE);
-      for (let dy = -1; dy <= 1; dy++) {
-        for (let dx = -1; dx <= 1; dx++) {
-          treeTiles.add(`${tx + dx},${ty + dy}`);
-        }
-      }
-    }
-
-    for (let ty = 0; ty < MAP_HEIGHT; ty++) {
-      for (let tx = 0; tx < MAP_WIDTH; tx++) {
-        const dFromSpawn = Math.max(
-          Math.abs(tx - centerTX),
-          Math.abs(ty - centerTY)
-        );
-        if (dFromSpawn < SPAWN_SAFE_TILES) continue;
-        if (tx < 2 || tx > MAP_WIDTH - 3) continue;
-        if (treeTiles.has(`${tx},${ty}`)) continue;
-        if (protectedTiles.has(`${tx},${ty}`)) continue;
-        if (Math.random() > density) continue;
-
-        const px = tx * TILE_SIZE + TILE_SIZE / 2;
-        const py = ty * TILE_SIZE + TILE_SIZE / 2;
-
-        const rock = this.obstacles.create(px, py, 'rock') as Phaser.Physics.Arcade.Image;
-        rock.setDepth(py);
-        rock.refreshBody();
-      }
-    }
-
-    for (const pos of TREE_POSITIONS) {
-      const blocker = this.treeObstacles.create(
-        pos.x, pos.y + 4, 'blocker'
-      ) as Phaser.Physics.Arcade.Image;
-      blocker.setVisible(false);
-      blocker.refreshBody();
-    }
+    for (let y = 0; y < MAP_HEIGHT; y++)
+      for (let x = 0; x < MAP_WIDTH; x++)
+        layer.putTileAt(weights[Math.floor(Math.random() * weights.length)] % TILE_VARIANTS, x, y);
   }
 
   // ─── Zone loading ─────────────────────────────────────────────────────────
@@ -517,45 +263,39 @@ export class MainScene extends Phaser.Scene {
   private loadZone(zone: ZoneId, enteredFrom: EdgeDirection | null): void {
     this.currentZone = zone;
     const config = ZONE_CONFIGS[zone];
-
     this.clearZoneContent();
     this.exploredChunks.clear();
-
     this.groundLayer.setTint(ZONES[zone].tint);
 
     const protectedTiles = new Set<string>();
-    for (const spawn of config.enemySpawns) {
-      protectedTiles.add(`${spawn.tx},${spawn.ty}`);
-    }
-    for (const spawn of config.heartSpawns) {
-      protectedTiles.add(`${spawn.tx},${spawn.ty}`);
-    }
+    for (const spawn of config.enemySpawns) protectedTiles.add(`${spawn.tx},${spawn.ty}`);
+    for (const spawn of config.heartSpawns) protectedTiles.add(`${spawn.tx},${spawn.ty}`);
     for (const npc of config.npcs) {
       const tx = Math.floor(npc.x / TILE_SIZE);
       const ty = Math.floor(npc.y / TILE_SIZE);
-      for (let dy = -1; dy <= 1; dy++) {
-        for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++)
+        for (let dx = -1; dx <= 1; dx++)
           protectedTiles.add(`${tx + dx},${ty + dy}`);
-        }
-      }
     }
 
-    this.placeTrees(config.numTrees);
-    this.placeObstacles(config.obstacleDensity, protectedTiles);
-    this.placeDecorations(this.currentZone, protectedTiles);
-    if (this.currentZone === 'grasslands') this.placeVillage();
+    placeTrees(this, this.treeGroup, config.numTrees);
+    placeObstacles(this, this.obstacles, this.treeObstacles, config.obstacleDensity, protectedTiles);
+    placeDecorations(this, this.decorGroup, this.currentZone, protectedTiles);
+    if (this.currentZone === 'grasslands') placeVillage(this, this.obstacles, this.decorGroup);
     if (this.currentZone === 'forest') {
-      this.placeCampfire(centerX - 50, centerY + 195);
-      this.placeCampfire(centerX + 80, centerY + 195);
+      placeCampfire(this, this.decorGroup, centerX - 50, centerY + 195);
+      placeCampfire(this, this.decorGroup, centerX + 80, centerY + 195);
     }
     this.spawnEnemies(config.enemySpawns);
     this.spawnInitialItems(config.heartSpawns);
-    if (config.hazardSpawns) this.spawnHazards(config.hazardSpawns);
-    if (config.secretWall) this.spawnSecretWall(config.secretWall);
-    this.spawnNPCs(config.npcs);
-    if (config.bossSpawn) {
-      this.spawnBoss(config.bossSpawn.tx, config.bossSpawn.ty);
+    if (config.hazardSpawns) spawnHazards(this, this.hazardGroup, config.hazardSpawns);
+    if (config.secretWall) {
+      const secretId = `${this.currentZone}:${config.secretWall.tx},${config.secretWall.ty}`;
+      if (!this.openedSecrets.has(secretId))
+        spawnSecretWall(this, this.secretWallGroup, secretId, config.secretWall);
     }
+    this.spawnNPCs(config.npcs);
+    if (config.bossSpawn) this.spawnBoss(config.bossSpawn.tx, config.bossSpawn.ty);
     this.createTransitionZones(config.transitions);
 
     if (enteredFrom === 'east') {
@@ -568,7 +308,6 @@ export class MainScene extends Phaser.Scene {
 
     this.player.setZone(zone);
     this.player.setDepth(this.player.y + 1);
-
     this.game.events.emit(GAME_EVENTS.ZONE_CHANGE, this.currentZone);
 
     const musicTheme = zone === 'boss_room' ? 'boss'
@@ -584,31 +323,22 @@ export class MainScene extends Phaser.Scene {
       this.boss = null;
       this.game.events.emit(GAME_EVENTS.BOSS_HP, { hp: 0, maxHp: 0, phase: 1 });
     }
-
-    // Deactivate pooled projectiles instead of destroying them
     for (const proj of this.projectiles) proj.deactivate();
-
     for (const enemy of this.enemies) enemy.destroy();
     this.enemies.length = 0;
-
     for (const item of this.items) item.destroy();
     this.items.length = 0;
-
     for (const npc of this.npcs) npc.destroy();
     this.npcs.length = 0;
-
     for (const t of this.transitionZones) t.zone.destroy();
     this.transitionZones.length = 0;
-
     this.treeGroup.clear(true, true);
     this.decorGroup.clear(true, true);
     this.obstacles.clear(true, true);
     this.treeObstacles.clear(true, true);
     this.hazardGroup.clear(true, true);
     this.secretWallGroup.clear(true, true);
-
-    this.activeChest = null;
-    this.activeNpc = null;
+    this.interactionMgr?.reset();
   }
 
   // ─── Enemies ──────────────────────────────────────────────────────────────
@@ -641,7 +371,7 @@ export class MainScene extends Phaser.Scene {
     }
   }
 
-  private spawnWorldItem(x: number, y: number, type: WorldItemType): Item {
+  spawnWorldItem(x: number, y: number, type: WorldItemType): Item {
     const item = new Item(this, x, y, type);
     this.items.push(item);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -668,7 +398,6 @@ export class MainScene extends Phaser.Scene {
     const py = ty * TILE_SIZE + TILE_SIZE / 2;
     this.boss = new Boss(this, px, py);
     this.boss.emitHp();
-
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     this.physics.add.collider(this.boss as any, this.obstacles);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -676,9 +405,7 @@ export class MainScene extends Phaser.Scene {
 
     this.physics.add.overlap(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      this.player as any,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      this.boss as any,
+      this.player as any, this.boss as any,
       () => {
         if (!this.boss || this.boss.isDying()) return;
         this.player.takeDamage(2);
@@ -691,10 +418,7 @@ export class MainScene extends Phaser.Scene {
       this.boss as any,
       () => {
         if (!this.boss || !this.boss.canBeHit()) return;
-        const died = this.boss.takeDamage(
-          this.currentAttackDamage,
-          (bx, by) => this.onBossDeath(bx, by)
-        );
+        const died = this.boss.takeDamage(this.currentAttackDamage, (bx, by) => this.onBossDeath(bx, by));
         if (!died) {
           SoundSystem.playEnemyHit();
           this.cameras.main.shake(120, 0.004);
@@ -705,7 +429,6 @@ export class MainScene extends Phaser.Scene {
       }
     );
 
-    // Player projectiles ↔ boss
     this.physics.add.overlap(
       this.projectiles as unknown as Phaser.GameObjects.GameObject[],
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -754,43 +477,42 @@ export class MainScene extends Phaser.Scene {
     });
   }
 
+  // ─── Secret wall ──────────────────────────────────────────────────────────
+
+  private openSecret(wall: Phaser.Physics.Arcade.Image): void {
+    if (!wall.active) return;
+    const secretId = wall.getData('secretId') as string;
+    const reward = wall.getData('reward') as InventoryItem;
+    if (this.openedSecrets.has(secretId)) return;
+    this.openedSecrets.add(secretId);
+    this.juice.spawnParticleBurst(wall.x, wall.y, 0xfde68a, 18, 85, 550);
+    this.juice.spawnParticleBurst(wall.x, wall.y, 0xfbbf24, 12, 55, 400);
+    this.cameras.main.shake(250, 0.008);
+    SoundSystem.playChestOpen();
+    wall.destroy();
+    this.interactionMgr.applyChestReward(reward);
+    this.saveCurrentState();
+  }
+
   // ─── Transitions ──────────────────────────────────────────────────────────
 
   private createTransitionZones(transitions: ZoneConfig['transitions']): void {
     const edgeHeight = WORLD_HEIGHT - 4 * TILE_SIZE;
 
     if (transitions.east) {
-      const zone = this.add.zone(
-        WORLD_WIDTH - TRANSITION_ZONE_THICKNESS / 2,
-        centerY,
-        TRANSITION_ZONE_THICKNESS,
-        edgeHeight
-      );
+      const zone = this.add.zone(WORLD_WIDTH - TRANSITION_ZONE_THICKNESS / 2, centerY, TRANSITION_ZONE_THICKNESS, edgeHeight);
       this.physics.add.existing(zone);
-      const body = zone.body as Phaser.Physics.Arcade.Body;
-      body.setAllowGravity(false);
-      body.setImmovable(true);
+      (zone.body as Phaser.Physics.Arcade.Body).setAllowGravity(false).setImmovable(true);
       this.transitionZones.push({ zone, target: transitions.east, edge: 'east' });
-      this.physics.add.overlap(this.player, zone, () => {
-        this.changeToZone('east', transitions.east!);
-      });
+      this.physics.add.overlap(this.player, zone, () => this.changeToZone('east', transitions.east!));
     }
 
     if (transitions.west) {
-      const zone = this.add.zone(
-        TRANSITION_ZONE_THICKNESS / 2,
-        centerY,
-        TRANSITION_ZONE_THICKNESS,
-        edgeHeight
-      );
+      const zone = this.add.zone(TRANSITION_ZONE_THICKNESS / 2, centerY, TRANSITION_ZONE_THICKNESS, edgeHeight);
       this.physics.add.existing(zone);
-      const body = zone.body as Phaser.Physics.Arcade.Body;
-      body.setAllowGravity(false);
-      body.setImmovable(true);
+      (zone.body as Phaser.Physics.Arcade.Body).setAllowGravity(false).setImmovable(true);
       this.transitionZones.push({ zone, target: transitions.west, edge: 'west' });
-      this.physics.add.overlap(this.player, zone, () => {
-        this.changeToZone('west', transitions.west!);
-      });
+      this.physics.add.overlap(this.player, zone, () => this.changeToZone('west', transitions.west!));
     }
   }
 
@@ -799,7 +521,6 @@ export class MainScene extends Phaser.Scene {
     this.isTransitioning = true;
     this.player.setFrozen(true);
     SoundSystem.playZoneTransition();
-
     this.cameras.main.fadeOut(TRANSITION_FADE_MS, 0, 0, 0);
     this.cameras.main.once('camerafadeoutcomplete', () => {
       this.loadZone(nextZone, fromDirection);
@@ -808,7 +529,6 @@ export class MainScene extends Phaser.Scene {
         this.isTransitioning = false;
         this.player.setFrozen(false);
         this.saveCurrentState();
-
         if (nextZone === 'boss_room' && !this.bossIntroShown) {
           this.bossIntroShown = true;
           this.time.delayedCall(500, () => {
@@ -829,7 +549,7 @@ export class MainScene extends Phaser.Scene {
     });
   }
 
-  // ─── Persistent colliders (set up once, use array refs) ───────────────────
+  // ─── Persistent colliders ─────────────────────────────────────────────────
 
   private setupPersistentColliders(): void {
     this.physics.add.collider(this.player, this.obstacles);
@@ -837,15 +557,13 @@ export class MainScene extends Phaser.Scene {
 
     this.physics.add.overlap(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      this.player as any,
-      this.hazardGroup,
+      this.player as any, this.hazardGroup,
       () => {
         if (this.hazardCooldown > 0) return;
         this.player.takeDamage(1);
         this.hazardCooldown = HAZARD_DAMAGE_INTERVAL;
       },
-      undefined,
-      this
+      undefined, this
     );
 
     this.physics.add.overlap(
@@ -857,8 +575,7 @@ export class MainScene extends Phaser.Scene {
         if (enemy.isDying()) return;
         this.player.takeDamage(enemy.getContactDamage());
       },
-      undefined,
-      this
+      undefined, this
     );
 
     this.physics.add.overlap(
@@ -869,7 +586,6 @@ export class MainScene extends Phaser.Scene {
         if (!enemy.canBeHit()) return;
         const eid = enemy.name;
         enemy.takeDamage(this.currentAttackDamage, (ex, ey) => this.onEnemyDeath(ex, ey, eid));
-
         SoundSystem.playEnemyHit();
         HapticSystem.hit();
         this.cameras.main.shake(120, 0.004);
@@ -878,11 +594,9 @@ export class MainScene extends Phaser.Scene {
         this.juice.triggerFreezeFrame(50);
         this.incrementCombo();
       },
-      undefined,
-      this
+      undefined, this
     );
 
-    // Player projectiles ↔ enemies (piercing-aware)
     this.physics.add.overlap(
       this.projectiles as unknown as Phaser.GameObjects.GameObject[],
       this.enemies as unknown as Phaser.GameObjects.GameObject[],
@@ -900,11 +614,9 @@ export class MainScene extends Phaser.Scene {
         this.juice.showDamageNumber(enemy.x, enemy.y - 10, this.currentProjectileDamage, false);
         this.incrementCombo();
       },
-      undefined,
-      this
+      undefined, this
     );
 
-    // Enemy projectiles ↔ player
     this.physics.add.overlap(
       this.projectiles as unknown as Phaser.GameObjects.GameObject[],
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -915,42 +627,54 @@ export class MainScene extends Phaser.Scene {
         proj.hit();
         this.player.takeDamage(1);
       },
-      undefined,
-      this
+      undefined, this
     );
 
-    // Attack zone ↔ secret walls
     this.physics.add.overlap(
       this.player.getAttackZone(),
       this.secretWallGroup,
-      (_zone, wallObj) => {
-        this.openSecret(wallObj as Phaser.Physics.Arcade.Image);
-      },
-      undefined,
-      this
+      (_zone, wallObj) => this.openSecret(wallObj as Phaser.Physics.Arcade.Image),
+      undefined, this
     );
   }
+
+  // ─── Combat events ────────────────────────────────────────────────────────
 
   private onEnemyDeath(x: number, y: number, enemyId: string): void {
     if (enemyId) this.killedEnemyIds.add(enemyId);
     this.enemies = this.enemies.filter((e) => !e.isDying() && e.active);
-    if (Math.random() < CHEST_DROP_CHANCE) {
-      this.spawnWorldItem(x, y, 'chest');
-    }
+    if (Math.random() < CHEST_DROP_CHANCE) this.spawnWorldItem(x, y, 'chest');
     this.gainXp(XP_PER_ENEMY);
     SoundSystem.playEnemyDeath();
     HapticSystem.death();
     this.juice.spawnParticleBurst(x, y, 0xef4444, 12, 70, 500);
     this.juice.spawnParticleBurst(x, y, 0xfbbf24, 6, 45, 400);
     this.juice.flashScreen();
-
     if (this.questKills < 5) {
       this.questKills++;
       this.emitQuestState();
-      if (this.questKills === 5) {
-        this.game.events.emit(GAME_EVENTS.QUEST_COMPLETE, '5 Feinde besiegt!');
-      }
+      if (this.questKills === 5) this.game.events.emit(GAME_EVENTS.QUEST_COMPLETE, '5 Feinde besiegt!');
     }
+  }
+
+  private onPlayerDamaged(pos: { x: number; y: number }): void {
+    SoundSystem.playPlayerDamage();
+    HapticSystem.hit();
+    this.resetCombo();
+    this.juice.spawnParticleBurst(pos.x, pos.y, 0xffffff, 8, 55, 350);
+    this.juice.spawnParticleBurst(pos.x, pos.y, 0xfde68a, 5, 35, 280);
+    this.juice.showDamageNumber(pos.x, pos.y - 10, 2, false);
+    if (this.player.getHp() <= 1) HapticSystem.danger();
+    if (this.player.getHp() > 0) this.saveCurrentState();
+  }
+
+  private onShieldBlock(pos: { x: number; y: number }): void {
+    SoundSystem.playShieldBlock();
+    this.juice.spawnParticleBurst(pos.x, pos.y, 0x60a5fa, 10, 45, 320);
+    this.juice.spawnParticleBurst(pos.x, pos.y, 0xbfdbfe, 6, 28, 240);
+    this.juice.showDamageNumber(pos.x, pos.y - 10, 0, true);
+    this.cameras.main.shake(80, 0.003);
+    if (this.parryXpBonus > 0) this.gainXp(this.parryXpBonus);
   }
 
   private incrementCombo(): void {
@@ -964,30 +688,6 @@ export class MainScene extends Phaser.Scene {
     this.combo = 0;
     this.comboResetTimer = 0;
     this.game.events.emit(GAME_EVENTS.COMBO_CHANGE, 0);
-  }
-
-  // ─── Player damaged handler ───────────────────────────────────────────────
-
-  private onPlayerDamaged(pos: { x: number; y: number }): void {
-    SoundSystem.playPlayerDamage();
-    HapticSystem.hit();
-    this.resetCombo();
-    this.juice.spawnParticleBurst(pos.x, pos.y, 0xffffff, 8, 55, 350);
-    this.juice.spawnParticleBurst(pos.x, pos.y, 0xfde68a, 5, 35, 280);
-    this.juice.showDamageNumber(pos.x, pos.y - 10, 2, false);
-    if (this.player.getHp() <= 1) HapticSystem.danger();
-    if (this.player.getHp() > 0) {
-      this.saveCurrentState();
-    }
-  }
-
-  private onShieldBlock(pos: { x: number; y: number }): void {
-    SoundSystem.playShieldBlock();
-    this.juice.spawnParticleBurst(pos.x, pos.y, 0x60a5fa, 10, 45, 320);
-    this.juice.spawnParticleBurst(pos.x, pos.y, 0xbfdbfe, 6, 28, 240);
-    this.juice.showDamageNumber(pos.x, pos.y - 10, 0, true);
-    this.cameras.main.shake(80, 0.003);
-    if (this.parryXpBonus > 0) this.gainXp(this.parryXpBonus);
   }
 
   // ─── Projectile pool ──────────────────────────────────────────────────────
@@ -1017,15 +717,9 @@ export class MainScene extends Phaser.Scene {
         available.splice(idx, 1);
       }
       if (!matched) continue;
-
-      // Apply synergy effects idempotently
-      if (syn.label === 'Durchdringende Schüsse' && this.piercingShots < 2) {
-        this.piercingShots = 2;
-      } else if (syn.label === 'Parrier-Meister' && this.parryXpBonus === 0) {
-        this.parryXpBonus = 3;
-      } else if (syn.label === 'Heilsame Tränke' && !this.enhancedPotions) {
-        this.enhancedPotions = true;
-      }
+      if (syn.label === 'Durchdringende Schüsse' && this.piercingShots < 2) this.piercingShots = 2;
+      else if (syn.label === 'Parrier-Meister' && this.parryXpBonus === 0) this.parryXpBonus = 3;
+      else if (syn.label === 'Heilsame Tränke' && !this.enhancedPotions) this.enhancedPotions = true;
     }
   }
 
@@ -1045,65 +739,23 @@ export class MainScene extends Phaser.Scene {
     this.game.events.emit(GAME_EVENTS.QUEST_UPDATE, state);
   }
 
-  // ─── Campfire ─────────────────────────────────────────────────────────────
-
-  private placeCampfire(x: number, y: number): void {
-    const gfx = this.add.graphics();
-    // Ground ring
-    gfx.fillStyle(0x44403c, 0.7);
-    gfx.fillCircle(x, y + 6, 8);
-    // Logs
-    gfx.lineStyle(2, 0x78350f, 1);
-    gfx.lineBetween(x - 6, y + 8, x + 6, y + 2);
-    gfx.lineBetween(x + 6, y + 8, x - 6, y + 2);
-    // Flame
-    gfx.fillStyle(0xff6600, 0.9);
-    gfx.fillTriangle(x - 4, y + 4, x + 4, y + 4, x, y - 8);
-    gfx.fillStyle(0xffaa00, 0.85);
-    gfx.fillTriangle(x - 2, y + 4, x + 2, y + 4, x, y - 4);
-    gfx.fillStyle(0xffee00, 0.7);
-    gfx.fillTriangle(x - 1, y + 3, x + 1, y + 3, x, y);
-    gfx.setDepth(y + 1);
-
-    this.tweens.add({
-      targets: gfx,
-      alpha: { from: 0.75, to: 1 },
-      scaleX: { from: 0.95, to: 1.05 },
-      scaleY: { from: 0.95, to: 1.05 },
-      yoyo: true,
-      repeat: -1,
-      duration: 280 + Math.random() * 120,
-      ease: 'Sine.easeInOut',
-    });
-
-    this.decorGroup.add(gfx);
-  }
-
   // ─── Minimap ──────────────────────────────────────────────────────────────
 
   private emitMinimapUpdate(): void {
     const sx = 1 / WORLD_WIDTH;
     const sy = 1 / WORLD_HEIGHT;
-
-    // Mark current chunk as explored
-    const cx = Math.floor(this.player.x / (TILE_SIZE * this.CHUNK_SIZE));
-    const cy = Math.floor(this.player.y / (TILE_SIZE * this.CHUNK_SIZE));
-    for (let dy = -1; dy <= 1; dy++) {
-      for (let dx = -1; dx <= 1; dx++) {
-        this.exploredChunks.add(`${cx + dx},${cy + dy}`);
-      }
-    }
+    const cx2 = Math.floor(this.player.x / (TILE_SIZE * this.CHUNK_SIZE));
+    const cy2 = Math.floor(this.player.y / (TILE_SIZE * this.CHUNK_SIZE));
+    for (let dy = -1; dy <= 1; dy++)
+      for (let dx = -1; dx <= 1; dx++)
+        this.exploredChunks.add(`${cx2 + dx},${cy2 + dy}`);
 
     const data: MinimapData = {
       player: { nx: this.player.x * sx, ny: this.player.y * sy },
-      enemies: this.enemies
-        .filter(e => e.active && !e.isDying())
-        .map(e => ({ nx: e.x * sx, ny: e.y * sy })),
+      enemies: this.enemies.filter(e => e.active && !e.isDying()).map(e => ({ nx: e.x * sx, ny: e.y * sy })),
       boss: (this.boss && this.boss.active && !this.boss.isDying())
         ? { nx: this.boss.x * sx, ny: this.boss.y * sy } : null,
-      chests: this.items
-        .filter(i => i.active && i.itemType === 'chest' && !i.isOpened())
-        .map(i => ({ nx: i.x * sx, ny: i.y * sy })),
+      chests: this.items.filter(i => i.active && i.itemType === 'chest' && !i.isOpened()).map(i => ({ nx: i.x * sx, ny: i.y * sy })),
       zone: this.currentZone,
       exploredChunks: [...this.exploredChunks],
     };
@@ -1134,9 +786,7 @@ export class MainScene extends Phaser.Scene {
     if (this.level >= MAX_LEVEL) return;
     this.xp += amount;
     const threshold = XP_THRESHOLDS[this.level - 1];
-    this.game.events.emit(GAME_EVENTS.XP_CHANGE, {
-      xp: this.xp, level: this.level, nextLevelXp: threshold,
-    });
+    this.game.events.emit(GAME_EVENTS.XP_CHANGE, { xp: this.xp, level: this.level, nextLevelXp: threshold });
     if (this.xp >= threshold) {
       this.level++;
       this.onLevelUp();
@@ -1155,10 +805,8 @@ export class MainScene extends Phaser.Scene {
     this.juice.spawnParticleBurst(this.player.x, this.player.y, 0x4ade80, 12, 60, 400);
     this.cameras.main.shake(200, 0.006);
     this.saveCurrentState();
-
     const allSkills: LevelUpSkill[] = ['hp_up', 'attack_up', 'shield', 'xp_boost', 'speed_up'];
-    const shuffled = allSkills.sort(() => Math.random() - 0.5);
-    const choices = shuffled.slice(0, 3);
+    const choices = allSkills.sort(() => Math.random() - 0.5).slice(0, 3);
     this.scene.pause();
     this.game.events.emit(GAME_EVENTS.LEVEL_UP_CHOICE, { skills: choices, chosen: [...this.chosenSkills] });
   }
@@ -1167,21 +815,11 @@ export class MainScene extends Phaser.Scene {
     this.scene.resume();
     this.chosenSkills.push(skill);
     switch (skill) {
-      case 'hp_up':
-        this.player.setHp(Math.min(MAX_HP + 2, this.player.getHp() + 2));
-        break;
-      case 'attack_up':
-        this.currentAttackDamage += 2;
-        break;
-      case 'shield':
-        this.player.addShield();
-        break;
-      case 'xp_boost':
-        this.gainXp(20);
-        break;
-      case 'speed_up':
-        this.player.applySpeedBoost(1.15);
-        break;
+      case 'hp_up': this.player.setHp(Math.min(MAX_HP + 2, this.player.getHp() + 2)); break;
+      case 'attack_up': this.currentAttackDamage += 2; break;
+      case 'shield': this.player.addShield(); break;
+      case 'xp_boost': this.gainXp(20); break;
+      case 'speed_up': this.player.applySpeedBoost(1.15); break;
     }
     this.checkSynergies();
     this.juice.spawnParticleBurst(this.player.x, this.player.y, 0xfde68a, 18, 90, 550);
@@ -1192,9 +830,8 @@ export class MainScene extends Phaser.Scene {
 
   private addToInventory(item: InventoryItem): void {
     this.inventory = [...this.inventory, item];
-    if (this.inventory.length > MAX_INVENTORY) {
+    if (this.inventory.length > MAX_INVENTORY)
       this.inventory = this.inventory.slice(this.inventory.length - MAX_INVENTORY);
-    }
     this.recalculateAttackDamage();
     this.emitInventoryChange();
     this.saveCurrentState();
@@ -1207,134 +844,6 @@ export class MainScene extends Phaser.Scene {
 
   private emitInventoryChange(): void {
     this.game.events.emit(GAME_EVENTS.INVENTORY_CHANGE, [...this.inventory]);
-  }
-
-  // ─── Interaction (NPC priority over chest) ────────────────────────────────
-
-  private updateInteractions(): void {
-    this.items = this.items.filter((item) => item.active);
-    this.npcs = this.npcs.filter((n) => n.active);
-
-    // Auto-collect heart and potion pickups
-    for (const item of this.items) {
-      if ((item.itemType === 'heart_pickup' || item.itemType === 'potion_pickup') && !item.isOpened()) {
-        const dist = Phaser.Math.Distance.Between(item.x, item.y, this.player.x, this.player.y);
-        if (dist < 22) {
-          const ix = item.x;
-          const iy = item.y;
-          const isPotion = item.itemType === 'potion_pickup';
-          item.collect(() => {
-            if (isPotion) {
-              SoundSystem.playPickup();
-              this.addToInventory('potion');
-              this.juice.spawnParticleBurst(ix, iy, 0x4ade80, 6, 36, 350);
-            } else {
-              this.player.heal(HEART_HEAL_AMOUNT);
-              SoundSystem.playHeal();
-              this.addToInventory('heart');
-              this.juice.spawnParticleBurst(ix, iy, 0x4ade80, 8, 42, 400);
-              this.juice.showDamageNumber(ix, iy - 8, HEART_HEAL_AMOUNT, true);
-            }
-          });
-        }
-      }
-    }
-
-    // NPC proximity
-    let nearestNpc: NPC | null = null;
-    let nearestNpcDist = NPC_INTERACT_RADIUS;
-    for (const npc of this.npcs) {
-      const d = Phaser.Math.Distance.Between(npc.x, npc.y, this.player.x, this.player.y);
-      if (d < nearestNpcDist) {
-        nearestNpcDist = d;
-        nearestNpc = npc;
-      }
-    }
-
-    // Chest proximity (only if no NPC is available)
-    let nearestChest: Item | null = null;
-    if (!nearestNpc) {
-      let nearestChestDist = CHEST_INTERACT_RADIUS;
-      for (const item of this.items) {
-        if (item.itemType !== 'chest' || item.isOpened()) continue;
-        const d = Phaser.Math.Distance.Between(item.x, item.y, this.player.x, this.player.y);
-        if (d < nearestChestDist) {
-          nearestChestDist = d;
-          nearestChest = item;
-        }
-      }
-    }
-
-    // Update prompts
-    if (nearestNpc !== this.activeNpc) {
-      this.activeNpc?.showInteractPrompt(false);
-      this.activeNpc = nearestNpc;
-    }
-    if (nearestChest !== this.activeChest) {
-      this.activeChest?.showInteractPrompt(false);
-      this.activeChest = nearestChest;
-    }
-
-    if (this.activeNpc) {
-      this.activeNpc.showInteractPrompt(true);
-      this.player.setNearInteractable(true);
-      if (this.player.wantsInteract()) {
-        this.openDialog(this.activeNpc);
-      }
-    } else if (this.activeChest) {
-      this.activeChest.showInteractPrompt(true);
-      this.player.setNearInteractable(true);
-      if (this.player.wantsInteract()) {
-        const chestX = this.activeChest.x;
-        const chestY = this.activeChest.y;
-        const reward = this.activeChest.openChest();
-        if (reward) {
-          SoundSystem.playChestOpen();
-          this.applyChestReward(reward);
-          this.juice.spawnParticleBurst(chestX, chestY, 0x4ade80, 10, 55, 480);
-        }
-        this.activeChest = null;
-      }
-    } else {
-      this.player.setNearInteractable(false);
-    }
-  }
-
-  private openDialog(npc: NPC): void {
-    this.player.setDialogActive(true);
-    const payload: DialogPayload = { npcName: npc.npcName, lines: npc.lines, portrait: npc.portrait, portraitColumns: npc.portraitColumns };
-    this.game.events.emit(GAME_EVENTS.DIALOG_OPEN, payload);
-  }
-
-  private handleDialogClose(): void {
-    this.player.setDialogActive(false);
-  }
-
-  private applyChestReward(reward: InventoryItem): void {
-    if (reward === 'heart') this.player.heal(HEART_HEAL_AMOUNT);
-    if (reward === 'shield_fragment') {
-      this.player.addShield();
-      if (!this.questShieldFound) {
-        this.questShieldFound = true;
-        this.emitQuestState();
-        this.game.events.emit(GAME_EVENTS.QUEST_COMPLETE, 'Schild-Fragment gefunden!');
-      }
-    }
-    if (reward === 'projectile_upgrade') this.currentProjectileDamage++;
-    this.addToInventory(reward);
-  }
-
-  private handleUsePotion(): void {
-    const idx = this.inventory.indexOf('potion');
-    if (idx === -1 || this.player.getHp() >= MAX_HP) return;
-    this.inventory.splice(idx, 1);
-    const healAmount = POTION_HEAL_AMOUNT + (this.enhancedPotions ? 2 : 0);
-    this.player.heal(healAmount);
-    SoundSystem.playHeal();
-    this.emitInventoryChange();
-    this.juice.spawnParticleBurst(this.player.x, this.player.y, 0x4ade80, 10, 50, 450);
-    this.juice.showDamageNumber(this.player.x, this.player.y - 20, healAmount, true);
-    this.saveCurrentState();
   }
 
   // ─── Camera & depth ───────────────────────────────────────────────────────
@@ -1355,7 +864,6 @@ export class MainScene extends Phaser.Scene {
   update(_time: number, delta: number): void {
     if (this.hazardCooldown > 0) this.hazardCooldown = Math.max(0, this.hazardCooldown - delta);
 
-    // Combo reset timer
     if (this.combo > 0 && this.comboResetTimer > 0) {
       this.comboResetTimer -= delta;
       if (this.comboResetTimer <= 0) this.resetCombo();
@@ -1375,32 +883,21 @@ export class MainScene extends Phaser.Scene {
       }
     }
 
-    for (const item of this.items) {
-      if (item.active) item.update(delta);
-    }
-
-    for (const npc of this.npcs) {
-      if (npc.active) npc.update(delta);
-    }
+    for (const item of this.items) if (item.active) item.update(delta);
+    for (const npc of this.npcs) if (npc.active) npc.update(delta);
 
     if (this.boss?.active) {
       this.boss.update(this.player.x, this.player.y, delta);
       if (this.boss.wantsShoot()) {
-        const angles = this.boss.getShootAngles(this.player.x, this.player.y);
-        for (const angle of angles) {
+        for (const angle of this.boss.getShootAngles(this.player.x, this.player.y))
           this.getProjectile(this.boss.x, this.boss.y, angle, true);
-        }
         this.boss.markShot();
         SoundSystem.playProjectile();
       }
     }
 
-    // Update projectiles (pool-aware: skip inactive)
-    for (const proj of this.projectiles) {
-      if (proj.active) proj.update(delta);
-    }
+    for (const proj of this.projectiles) if (proj.active) proj.update(delta);
 
-    // Ranged attack: Y key
     if (this.player.wantsShoot()) {
       const angle = DIRECTION_ANGLES[this.player.getLastDirection()] ?? 0;
       this.getProjectile(this.player.x, this.player.y, angle, false, this.piercingShots);
@@ -1409,18 +906,16 @@ export class MainScene extends Phaser.Scene {
     }
 
     if (!this.isTransitioning && !this.player.isDialogActive()) {
-      this.updateInteractions();
+      this.interactionMgr.update();
     }
 
     if (Phaser.Input.Keyboard.JustDown(this.useItemKey) && !this.player.isDialogActive()) {
-      this.handleUsePotion();
+      this.interactionMgr.handleUsePotion();
     }
 
-    // Ambient camera breathing — very slow sin-wave follow offset
     this.ambientBreathTime += delta * 0.00055;
     this.cameras.main.setFollowOffset(0, Math.sin(this.ambientBreathTime) * 1.2);
 
-    // Minimap: throttled to ~10 fps
     this.minimapThrottle += delta;
     if (this.minimapThrottle >= 100) {
       this.minimapThrottle = 0;
