@@ -688,7 +688,7 @@ export class MainScene extends Phaser.Scene {
     this.juice.spawnParticleBurst(pos.x, pos.y, 0xffffff, 8, 55, 350);
     this.juice.spawnParticleBurst(pos.x, pos.y, 0xfde68a, 5, 35, 280);
     this.juice.showDamageNumber(pos.x, pos.y - 10, 2, false);
-    if (this.player.getHp() <= 1) HapticSystem.danger();
+    if (this.player.getHp() <= 2) { HapticSystem.danger(); SoundSystem.setCombatIntensity(1); }
     if (this.player.getHp() > 0) this.saveCurrentState();
   }
 
@@ -705,6 +705,7 @@ export class MainScene extends Phaser.Scene {
     this.combo++;
     this.comboResetTimer = this.COMBO_RESET_MS;
     this.game.events.emit(GAME_EVENTS.COMBO_CHANGE, this.combo);
+    if (this.combo >= 5) SoundSystem.setCombatIntensity(2);
   }
 
   private resetCombo(): void {
@@ -712,6 +713,7 @@ export class MainScene extends Phaser.Scene {
     this.combo = 0;
     this.comboResetTimer = 0;
     this.game.events.emit(GAME_EVENTS.COMBO_CHANGE, 0);
+    if (this.player.getHp() > 2) SoundSystem.setCombatIntensity(0);
   }
 
   // ─── Projectile pool ──────────────────────────────────────────────────────

@@ -11,6 +11,10 @@ class SoundSystemClass {
   private musicTimeout: ReturnType<typeof setTimeout> | null = null;
   private currentTheme: ZoneTheme | null = null;
 
+  private percussionGain: GainNode | null = null;
+  private percussionInterval: ReturnType<typeof setInterval> | null = null;
+  private _combatIntensity: 0 | 1 | 2 = 0;
+
   setVolume(v: number): void {
     this.volumeMultiplier = Math.max(0, Math.min(1, v));
     if (this.master) this.master.gain.value = 0.18 * this.volumeMultiplier;
@@ -155,6 +159,50 @@ class SoundSystemClass {
   stopMusicFade(): void {
     this.currentTheme = null;
     this.stopMusic();
+    this.setCombatIntensity(0);
+  }
+
+  setCombatIntensity(level: 0 | 1 | 2): void {
+    if (this._combatIntensity === level) return;
+    this._combatIntensity = level;
+    const ctx = this.ensure();
+
+    if (level === 0) {
+      if (this.percussionInterval) { clearInterval(this.percussionInterval); this.percussionInterval = null; }
+      if (this.percussionGain && ctx) {
+        this.percussionGain.gain.setTargetAtTime(0, ctx.currentTime, 0.4);
+      }
+      return;
+    }
+
+    if (!ctx) return;
+
+    if (!this.percussionGain) {
+      this.percussionGain = ctx.createGain();
+      this.percussionGain.gain.value = 0;
+      this.percussionGain.connect(ctx.destination);
+    }
+    const targetGain = level === 2 ? 0.045 * this.volumeMultiplier : 0.028 * this.volumeMultiplier;
+    this.percussionGain.gain.setTargetAtTime(targetGain, ctx.currentTime, 0.3);
+
+    if (!this.percussionInterval) {
+      const beatMs = level === 2 ? 333 : 500;
+      this.percussionInterval = setInterval(() => {
+        const c = this.ctx;
+        const g = this.percussionGain;
+        if (!c || !g || this._combatIntensity === 0) return;
+        const o = c.createOscillator();
+        const e = c.createGain();
+        o.type = 'sawtooth';
+        o.frequency.value = 55;
+        e.gain.setValueAtTime(0.9, c.currentTime);
+        e.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.1);
+        o.connect(e);
+        e.connect(g);
+        o.start(c.currentTime);
+        o.stop(c.currentTime + 0.12);
+      }, beatMs);
+    }
   }
 
   private tone(
