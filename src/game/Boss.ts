@@ -21,15 +21,17 @@ export class Boss extends Phaser.GameObjects.Container {
   private dying = false;
   private speed = BOSS_SPEED_P1;
   private phaseTriggered = false;
+  private phase3Triggered = false;
   private shootCooldown = 0;
   private readonly SHOOT_INTERVAL = 1800;
   private isTeleporting = false;
   private teleportTimer = 0;
-  private readonly TELEPORT_INTERVAL = 7000;
+  private teleportInterval = 7000;
   private lastPlayerX = 0;
   private lastPlayerY = 0;
+  private ngPlus = 0;
 
-  constructor(scene: Phaser.Scene, x: number, y: number) {
+  constructor(scene: Phaser.Scene, x: number, y: number, ngPlus = 0) {
     super(scene, x, y);
 
     this.ensureTextures(scene);
@@ -56,6 +58,7 @@ export class Boss extends Phaser.GameObjects.Container {
     body.setOffset(-16, 2);
     body.setCollideWorldBounds(true);
 
+    this.ngPlus = ngPlus;
     this.drawHpBar();
   }
 
@@ -162,7 +165,7 @@ export class Boss extends Phaser.GameObjects.Container {
       if (!this.isTeleporting) {
         this.teleportTimer = Math.max(0, this.teleportTimer - delta);
         if (this.teleportTimer <= 0) {
-          this.teleportTimer = this.TELEPORT_INTERVAL;
+          this.teleportTimer = this.teleportInterval;
           this.doTeleport();
         }
       }
@@ -205,7 +208,7 @@ export class Boss extends Phaser.GameObjects.Container {
   }
 
   wantsShoot(): boolean {
-    return this.phase === 2 && !this.dying && !this.isTeleporting && this.shootCooldown <= 0;
+    return this.phase >= 2 && !this.dying && !this.isTeleporting && this.shootCooldown <= 0;
   }
 
   markShot(): void {
@@ -214,6 +217,7 @@ export class Boss extends Phaser.GameObjects.Container {
 
   getShootAngles(playerX: number, playerY: number): number[] {
     const base = Math.atan2(playerY - this.y, playerX - this.x) * (180 / Math.PI);
+    if (this.phase >= 3) return [base - 40, base - 20, base, base + 20, base + 40];
     return [base - 25, base, base + 25];
   }
 
@@ -242,6 +246,11 @@ export class Boss extends Phaser.GameObjects.Container {
       this.enterPhase2();
     }
 
+    if (!this.phase3Triggered && this.ngPlus > 0 && this.hp <= Math.floor(BOSS_MAX_HP * 0.2)) {
+      this.phase3Triggered = true;
+      this.enterPhase3();
+    }
+
     if (this.hp <= 0) {
       this.die(onDeath);
       return true;
@@ -255,8 +264,19 @@ export class Boss extends Phaser.GameObjects.Container {
     this.sprite.setTexture('boss-p2');
     this.nameLabel.setColor('#e879f9');
     this.drawHpBar();
-    this.teleportTimer = this.TELEPORT_INTERVAL;
+    this.teleportTimer = this.teleportInterval;
     this.scene.game.events.emit('boss-phase-2', { x: this.x, y: this.y });
+  }
+
+  private enterPhase3(): void {
+    this.phase = 3;
+    this.teleportInterval = 4000;
+    this.sprite.setTint(0x3b0764);
+    this.nameLabel.setColor('#a78bfa');
+    this.scene.game.events.emit('boss-phase-3', {
+      x: this.x, y: this.y,
+      line: 'Jetzt zeige ich dir wahre Finsternis...',
+    });
   }
 
   canBeHit(): boolean {

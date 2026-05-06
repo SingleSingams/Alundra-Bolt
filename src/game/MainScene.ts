@@ -413,7 +413,7 @@ export class MainScene extends Phaser.Scene {
   private spawnBoss(tx: number, ty: number): void {
     const px = tx * TILE_SIZE + TILE_SIZE / 2;
     const py = ty * TILE_SIZE + TILE_SIZE / 2;
-    this.boss = new Boss(this, px, py);
+    this.boss = new Boss(this, px, py, this.ngPlus);
     this.boss.emitHp();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     this.physics.add.collider(this.boss as any, this.obstacles);
@@ -469,6 +469,16 @@ export class MainScene extends Phaser.Scene {
       this.juice.spawnParticleBurst(pos.x, pos.y, 0x9333ea, 22, 95, 650);
       this.juice.spawnParticleBurst(pos.x, pos.y, 0xec4899, 16, 70, 500);
       this.juice.flashScreen();
+    });
+    this.game.events.once('boss-phase-3', (data: { x: number; y: number; line: string }) => {
+      this.cameras.main.shake(600, 0.025);
+      this.juice.spawnParticleBurst(data.x, data.y, 0x3b0764, 28, 110, 700);
+      this.juice.spawnParticleBurst(data.x, data.y, 0xa855f7, 18, 80, 550);
+      this.juice.flashScreen();
+      this.game.events.emit(GAME_EVENTS.DIALOG_OPEN, {
+        npcName: 'VOID TYRANT',
+        lines: [data.line],
+      });
     });
   }
 
@@ -719,13 +729,15 @@ export class MainScene extends Phaser.Scene {
   // ─── Projectile pool ──────────────────────────────────────────────────────
 
   private getProjectile(x: number, y: number, angle: number, isEnemy: boolean, piercing = 0): Projectile {
+    const lvl = isEnemy ? 0 : Math.max(0, this.currentProjectileDamage - 1);
     const inactive = this.projectiles.find(p => !p.active);
     if (inactive) {
-      inactive.reset(x, y, angle, isEnemy, piercing);
+      inactive.reset(x, y, angle, isEnemy, piercing, lvl);
       return inactive;
     }
     const proj = new Projectile(this, x, y, angle, isEnemy);
     if (piercing > 0) proj.setPiercing(piercing);
+    if (!isEnemy) proj.setLevel(lvl);
     this.projectiles.push(proj);
     return proj;
   }

@@ -6,6 +6,7 @@ const PROJECTILE_LIFETIME = 1100;
 export class Projectile extends Phaser.GameObjects.Image {
   private lifetime = PROJECTILE_LIFETIME;
   private spent = false;
+  private projLevel = 0;
   isEnemyProjectile: boolean;
 
   // Piercing: track which enemies this projectile has already hit
@@ -51,23 +52,57 @@ export class Projectile extends Phaser.GameObjects.Image {
       g.generateTexture('projectile-enemy', 16, 16);
       g.destroy();
     }
+    if (!scene.textures.exists('projectile-lv1')) {
+      const g = scene.add.graphics();
+      g.fillStyle(0xf97316, 0.55);
+      g.fillCircle(8, 8, 9);
+      g.fillStyle(0xfed7aa, 1);
+      g.fillCircle(8, 8, 6);
+      g.fillStyle(0xff6a00, 1);
+      g.fillCircle(8, 8, 3);
+      g.generateTexture('projectile-lv1', 16, 16);
+      g.destroy();
+    }
+    if (!scene.textures.exists('projectile-lv2')) {
+      const g = scene.add.graphics();
+      g.fillStyle(0xef4444, 0.55);
+      g.fillCircle(9, 9, 10);
+      g.fillStyle(0xfca5a5, 1);
+      g.fillCircle(9, 9, 7);
+      g.fillStyle(0xff1a1a, 1);
+      g.fillCircle(9, 9, 4);
+      g.generateTexture('projectile-lv2', 18, 18);
+      g.destroy();
+    }
   }
 
   // ─── Pool support ────────────────────────────────────────────────────────
 
-  reset(x: number, y: number, angleDeg: number, isEnemy: boolean, piercing = 0): void {
+  private playerTextureKey(): string {
+    if (this.projLevel >= 2) return 'projectile-lv2';
+    if (this.projLevel >= 1) return 'projectile-lv1';
+    return 'projectile';
+  }
+
+  setLevel(n: number): void {
+    this.projLevel = n;
+    if (!this.isEnemyProjectile) this.setTexture(this.playerTextureKey());
+  }
+
+  reset(x: number, y: number, angleDeg: number, isEnemy: boolean, piercing = 0, level = 0): void {
     this.isEnemyProjectile = isEnemy;
+    this.projLevel = isEnemy ? 0 : level;
     this.spent = false;
     this.lifetime = PROJECTILE_LIFETIME;
     this.hitEnemies.clear();
     this.piercingHitsRemaining = piercing;
 
-    this.setTexture(isEnemy ? 'projectile-enemy' : 'projectile');
+    this.setTexture(isEnemy ? 'projectile-enemy' : this.playerTextureKey());
     this.setPosition(x, y);
     this.setActive(true);
     this.setVisible(true);
     this.setAlpha(1);
-    this.setScale(1);
+    this.setScale(level >= 2 ? 1.15 : 1);
     this.setDepth(5000);
 
     const body = this.body as Phaser.Physics.Arcade.Body;
