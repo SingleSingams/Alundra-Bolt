@@ -447,6 +447,11 @@ export function HUD({ hp, maxHp, inventory, zone, xp, level, nextLevelXp, minima
               {combo}×
             </div>
             <div className="text-[9px] tracking-widest uppercase font-bold text-stone-400 mt-0.5">Combo</div>
+            {combo >= 3 && (
+              <div className={cn('text-[9px] font-bold tracking-wide mt-0.5', combo >= 10 ? 'text-red-400' : combo >= 6 ? 'text-orange-400' : 'text-amber-400')}>
+                {combo >= 10 ? '×3 XP' : combo >= 6 ? '×2 XP' : '×1.5 XP'}
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -36,6 +36,8 @@ import {
   DialogPayload,
   XP_PER_ENEMY,
   XP_PER_BOSS,
+  COMBO_XP_MULT,
+  XP_BY_ENEMY_TYPE,
   MAX_LEVEL,
   XP_THRESHOLDS,
   MinimapData,
@@ -169,6 +171,7 @@ export class MainScene extends Phaser.Scene {
         setProjectileDamage: (v) => { this.currentProjectileDamage = v; },
         isEnhancedPotions: () => this.enhancedPotions,
         emitInventoryChange: () => this.emitInventoryChange(),
+        getCurrentZone: () => this.currentZone,
       },
     );
 
@@ -457,7 +460,7 @@ export class MainScene extends Phaser.Scene {
 
   private onBossDeath(x: number, y: number): void {
     this.boss = null;
-    this.gainXp(XP_PER_BOSS);
+    this.gainXpWithCombo(XP_PER_BOSS);
     SoundSystem.playBossDeath();
     if (!this.questBossKilled) {
       this.questBossKilled = true;
@@ -585,7 +588,8 @@ export class MainScene extends Phaser.Scene {
         const enemy = enemyObj as Enemy;
         if (!enemy.canBeHit()) return;
         const eid = enemy.name;
-        enemy.takeDamage(this.currentAttackDamage, (ex, ey) => this.onEnemyDeath(ex, ey, eid));
+        const etype = enemy.enemyType;
+        enemy.takeDamage(this.currentAttackDamage, (ex, ey) => this.onEnemyDeath(ex, ey, eid, etype));
         SoundSystem.playEnemyHit();
         HapticSystem.hit();
         this.cameras.main.shake(120, 0.004);
@@ -608,7 +612,8 @@ export class MainScene extends Phaser.Scene {
         if (hitResult === 'skip') return;
         if (hitResult === 'normal') proj.hit();
         const eid2 = enemy.name;
-        enemy.takeDamage(this.currentProjectileDamage, (ex, ey) => this.onEnemyDeath(ex, ey, eid2));
+        const etype2 = enemy.enemyType;
+        enemy.takeDamage(this.currentProjectileDamage, (ex, ey) => this.onEnemyDeath(ex, ey, eid2, etype2));
         SoundSystem.playProjectileHit();
         this.juice.spawnParticleBurst(enemy.x, enemy.y, 0xfbbf24, 5, 40, 280);
         this.juice.showDamageNumber(enemy.x, enemy.y - 10, this.currentProjectileDamage, false);
@@ -640,11 +645,11 @@ export class MainScene extends Phaser.Scene {
 
   // ─── Combat events ────────────────────────────────────────────────────────
 
-  private onEnemyDeath(x: number, y: number, enemyId: string): void {
+  private onEnemyDeath(x: number, y: number, enemyId: string, enemyType?: string): void {
     if (enemyId) this.killedEnemyIds.add(enemyId);
     this.enemies = this.enemies.filter((e) => !e.isDying() && e.active);
     if (Math.random() < CHEST_DROP_CHANCE) this.spawnWorldItem(x, y, 'chest');
-    this.gainXp(XP_PER_ENEMY);
+    this.gainXpWithCombo(XP_BY_ENEMY_TYPE[enemyType ?? ''] ?? XP_PER_ENEMY);
     SoundSystem.playEnemyDeath();
     HapticSystem.death();
     this.juice.spawnParticleBurst(x, y, 0xef4444, 12, 70, 500);
@@ -780,6 +785,12 @@ export class MainScene extends Phaser.Scene {
       questShieldFound: this.questShieldFound,
       questBossKilled: this.questBossKilled,
     });
+  }
+
+  private gainXpWithCombo(base: number): void {
+    const entry = COMBO_XP_MULT.find(e => this.combo >= e.min);
+    const mult = entry ? entry.mult : 1;
+    this.gainXp(Math.round(base * mult));
   }
 
   private gainXp(amount: number): void {

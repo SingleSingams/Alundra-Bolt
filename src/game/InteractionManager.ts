@@ -7,6 +7,7 @@ import { SoundSystem } from './SoundSystem';
 import {
   GAME_EVENTS,
   InventoryItem,
+  ZoneId,
   DialogPayload,
   HEART_HEAL_AMOUNT,
   POTION_HEAL_AMOUNT,
@@ -26,6 +27,7 @@ export interface InteractionCallbacks {
   setProjectileDamage(v: number): void;
   isEnhancedPotions(): boolean;
   emitInventoryChange(): void;
+  getCurrentZone(): ZoneId;
 }
 
 export class InteractionManager {
@@ -115,7 +117,7 @@ export class InteractionManager {
       if (this.player.wantsInteract()) {
         const chestX = this.activeChest.x;
         const chestY = this.activeChest.y;
-        const reward = this.activeChest.openChest();
+        const reward = this.activeChest.openChest(this.cb.getCurrentZone());
         if (reward) {
           SoundSystem.playChestOpen();
           this.applyChestReward(reward);

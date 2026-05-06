@@ -1,5 +1,5 @@
 import * as Phaser from 'phaser';
-import { InventoryItem } from './constants';
+import { InventoryItem, ZoneId, ZONE_LOOT_TABLE, rollLoot } from './constants';
 
 export type WorldItemType = 'chest' | 'heart_pickup' | 'potion_pickup';
 
@@ -162,13 +162,12 @@ export class Item extends Phaser.GameObjects.Container {
   }
 
   /** Opens a chest. Returns the granted inventory item, or null if not openable. */
-  openChest(): InventoryItem | null {
+  openChest(zone?: ZoneId): InventoryItem | null {
     if (this.itemType !== 'chest' || this.opened) return null;
     this.opened = true;
     this.showInteractPrompt(false);
     this.sprite.setTexture('chest-open');
 
-    // Sparkle tween
     this.scene.tweens.add({
       targets: this.sprite,
       y: this.sprite.y - 4,
@@ -177,6 +176,9 @@ export class Item extends Phaser.GameObjects.Container {
       ease: 'Sine.easeOut',
     });
 
+    if (zone && ZONE_LOOT_TABLE[zone]) return rollLoot(ZONE_LOOT_TABLE[zone]);
+
+    // fallback: original flat distribution
     const r = Math.random();
     if (r < 0.28) return 'heart';
     if (r < 0.50) return 'potion';

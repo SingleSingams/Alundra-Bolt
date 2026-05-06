@@ -28,6 +28,23 @@ export const PROJECTILE_DAMAGE = 1;
 
 export const XP_PER_ENEMY = 5;
 export const XP_PER_BOSS = 50;
+
+// Combo XP multiplier tiers (checked highest-first)
+export const COMBO_XP_MULT: Array<{ min: number; mult: number }> = [
+  { min: 10, mult: 3.0 },
+  { min: 6,  mult: 2.0 },
+  { min: 3,  mult: 1.5 },
+];
+
+// XP granted per enemy type on kill
+export const XP_BY_ENEMY_TYPE: Record<string, number> = {
+  basic:        5,
+  ranger:       7,
+  shielder:     8,
+  speedrunner:  6,
+  dragon:       15,
+  'dragon-red': 20,
+};
 export const MAX_LEVEL = 6;
 // Cumulative XP thresholds to reach levels 2–6
 export const XP_THRESHOLDS = [10, 30, 60, 100, 150] as const;
@@ -112,6 +129,26 @@ export interface MinimapData {
 export type InventoryItem = 'heart' | 'sword_upgrade' | 'potion' | 'shield_fragment' | 'projectile_upgrade';
 
 export type ZoneId = 'grasslands' | 'forest' | 'dungeon' | 'dungeon_interior' | 'boss_room';
+
+export interface LootEntry { item: InventoryItem; weight: number; }
+
+export const ZONE_LOOT_TABLE: Record<ZoneId, LootEntry[]> = {
+  grasslands:       [{ item: 'heart', weight: 50 }, { item: 'potion', weight: 30 }, { item: 'sword_upgrade', weight: 20 }],
+  forest:           [{ item: 'heart', weight: 50 }, { item: 'potion', weight: 30 }, { item: 'sword_upgrade', weight: 20 }],
+  dungeon:          [{ item: 'heart', weight: 30 }, { item: 'potion', weight: 30 }, { item: 'sword_upgrade', weight: 25 }, { item: 'shield_fragment', weight: 15 }],
+  dungeon_interior: [{ item: 'potion', weight: 25 }, { item: 'sword_upgrade', weight: 30 }, { item: 'projectile_upgrade', weight: 30 }, { item: 'shield_fragment', weight: 15 }],
+  boss_room:        [{ item: 'sword_upgrade', weight: 35 }, { item: 'projectile_upgrade', weight: 35 }, { item: 'shield_fragment', weight: 30 }],
+};
+
+export function rollLoot(table: LootEntry[]): InventoryItem {
+  const total = table.reduce((s, e) => s + e.weight, 0);
+  let r = Math.random() * total;
+  for (const entry of table) {
+    r -= entry.weight;
+    if (r <= 0) return entry.item;
+  }
+  return table[table.length - 1].item;
+}
 
 export interface ZoneMeta {
   id: ZoneId;
