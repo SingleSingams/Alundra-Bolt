@@ -46,6 +46,7 @@ import {
   NG_PLUS_HP_MULT,
   NG_PLUS_DAMAGE_MULT,
   SKILL_SYNERGIES,
+  QuestState,
 } from './constants';
 import { SaveSystem } from './SaveSystem';
 import { Boss } from './Boss';
@@ -108,6 +109,10 @@ export class MainScene extends Phaser.Scene {
   private parryXpBonus = 0;
   private enhancedPotions = false;
   private juice!: JuiceHelper;
+  private bossIntroShown = false;
+  private questKills = 0;
+  private questShieldFound = false;
+  private questBossKilled = false;
 
   constructor() {
     super({ key: 'MainScene' });
@@ -173,8 +178,23 @@ export class MainScene extends Phaser.Scene {
         xp: 0, level: 1, nextLevelXp: XP_THRESHOLDS[0],
       });
       this.game.events.emit(GAME_EVENTS.SHIELD_CHANGE, 0);
+      // Show Mira intro dialog for new games
+      this.time.delayedCall(900, () => {
+        const introPaylod: DialogPayload = {
+          npcName: 'Mira die Dorfälteste',
+          portrait: 'assets/portraits/elder-woman.png',
+          lines: [
+            'Willkommen, Ritter. Ich bin froh, dass du gekommen bist — wir brauchen dich.',
+            'Im Osten breitet sich das Dunkel aus. Der Leere-Tyrann erwacht nach hundert Jahren.',
+            'Deine Aufgabe: besiege seine Diener im Wald, finde das Schild im Verlies, und stelle dich dem Tyrannen selbst.',
+          ],
+        };
+        this.player.setDialogActive(true);
+        this.game.events.emit(GAME_EVENTS.DIALOG_OPEN, introPaylod);
+      });
     }
 
+    this.emitQuestState();
     this.useItemKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E);
 
     // React → Phaser: dialog close signal
@@ -521,6 +541,10 @@ export class MainScene extends Phaser.Scene {
     this.placeObstacles(config.obstacleDensity, protectedTiles);
     this.placeDecorations(this.currentZone, protectedTiles);
     if (this.currentZone === 'grasslands') this.placeVillage();
+    if (this.currentZone === 'forest') {
+      this.placeCampfire(centerX - 50, centerY + 195);
+      this.placeCampfire(centerX + 80, centerY + 195);
+    }
     this.spawnEnemies(config.enemySpawns);
     this.spawnInitialItems(config.heartSpawns);
     if (config.hazardSpawns) this.spawnHazards(config.hazardSpawns);
@@ -709,6 +733,10 @@ export class MainScene extends Phaser.Scene {
     this.boss = null;
     this.gainXp(XP_PER_BOSS);
     SoundSystem.playBossDeath();
+    if (!this.questBossKilled) {
+      this.questBossKilled = true;
+      this.emitQuestState();
+    }
     this.cameras.main.shake(500, 0.022);
     this.juice.spawnParticleBurst(x, y, 0xef4444, 24, 110, 700);
     this.juice.spawnParticleBurst(x, y, 0xfbbf24, 18, 85, 580);
@@ -776,6 +804,23 @@ export class MainScene extends Phaser.Scene {
         this.isTransitioning = false;
         this.player.setFrozen(false);
         this.saveCurrentState();
+
+        if (nextZone === 'boss_room' && !this.bossIntroShown) {
+          this.bossIntroShown = true;
+          this.time.delayedCall(500, () => {
+            const bossPayload: DialogPayload = {
+              npcName: 'Der Leere-Tyrann',
+              portrait: 'assets/portraits/void-tyrant.png',
+              lines: [
+                '...Endlich. Ich habe auf dich gewartet, kleiner Ritter.',
+                'Hundert Jahre schlief ich — bis das erste Schwert meinen Schlaf brach.',
+                'Nun stirbst du hier. In der Leere.',
+              ],
+            };
+            this.player.setDialogActive(true);
+            this.game.events.emit(GAME_EVENTS.DIALOG_OPEN, bossPayload);
+          });
+        }
       });
     });
   }
@@ -894,6 +939,11 @@ export class MainScene extends Phaser.Scene {
     this.juice.spawnParticleBurst(x, y, 0xef4444, 12, 70, 500);
     this.juice.spawnParticleBurst(x, y, 0xfbbf24, 6, 45, 400);
     this.juice.flashScreen();
+
+    if (this.questKills < 5) {
+      this.questKills++;
+      this.emitQuestState();
+    }
   }
 
   private incrementCombo(): void {
@@ -970,6 +1020,56 @@ export class MainScene extends Phaser.Scene {
         this.enhancedPotions = true;
       }
     }
+  }
+
+  // ─── Quest tracking ───────────────────────────────────────────────────────
+
+  private emitQuestState(): void {
+    let state: QuestState | null;
+    if (this.questKills < 5) {
+      state = { label: '5 Feinde besiegen', progress: this.questKills, goal: 5 };
+    } else if (!this.questShieldFound) {
+      state = { label: 'Schild-Fragment finden', progress: 0, goal: 1 };
+    } else if (!this.questBossKilled) {
+      state = { label: 'Den Tyrannen besiegen', progress: 0, goal: 1 };
+    } else {
+      state = null;
+    }
+    this.game.events.emit(GAME_EVENTS.QUEST_UPDATE, state);
+  }
+
+  // ─── Campfire ─────────────────────────────────────────────────────────────
+
+  private placeCampfire(x: number, y: number): void {
+    const gfx = this.add.graphics();
+    // Ground ring
+    gfx.fillStyle(0x44403c, 0.7);
+    gfx.fillCircle(x, y + 6, 8);
+    // Logs
+    gfx.lineStyle(2, 0x78350f, 1);
+    gfx.lineBetween(x - 6, y + 8, x + 6, y + 2);
+    gfx.lineBetween(x + 6, y + 8, x - 6, y + 2);
+    // Flame
+    gfx.fillStyle(0xff6600, 0.9);
+    gfx.fillTriangle(x - 4, y + 4, x + 4, y + 4, x, y - 8);
+    gfx.fillStyle(0xffaa00, 0.85);
+    gfx.fillTriangle(x - 2, y + 4, x + 2, y + 4, x, y - 4);
+    gfx.fillStyle(0xffee00, 0.7);
+    gfx.fillTriangle(x - 1, y + 3, x + 1, y + 3, x, y);
+    gfx.setDepth(y + 1);
+
+    this.tweens.add({
+      targets: gfx,
+      alpha: { from: 0.75, to: 1 },
+      scaleX: { from: 0.95, to: 1.05 },
+      scaleY: { from: 0.95, to: 1.05 },
+      yoyo: true,
+      repeat: -1,
+      duration: 280 + Math.random() * 120,
+      ease: 'Sine.easeInOut',
+    });
+
+    this.decorGroup.add(gfx);
   }
 
   // ─── Minimap ──────────────────────────────────────────────────────────────
@@ -1202,7 +1302,13 @@ export class MainScene extends Phaser.Scene {
 
   private applyChestReward(reward: InventoryItem): void {
     if (reward === 'heart') this.player.heal(HEART_HEAL_AMOUNT);
-    if (reward === 'shield_fragment') this.player.addShield();
+    if (reward === 'shield_fragment') {
+      this.player.addShield();
+      if (!this.questShieldFound) {
+        this.questShieldFound = true;
+        this.emitQuestState();
+      }
+    }
     if (reward === 'projectile_upgrade') this.currentProjectileDamage++;
     this.addToInventory(reward);
   }

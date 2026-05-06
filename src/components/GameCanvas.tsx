@@ -11,6 +11,7 @@ import {
   MinimapData,
   LevelUpSkill,
   LevelUpChoice,
+  QuestState,
 } from '../game/constants';
 import { SoundSystem } from '../game/SoundSystem';
 import { SettingsSystem, Settings } from '../game/SettingsSystem';
@@ -46,6 +47,7 @@ export function GameCanvas() {
   const [paused, setPaused] = useState(false);
   const [victory, setVictory] = useState<{ ngPlus: number } | null>(null);
   const [combo, setCombo] = useState(0);
+  const [quest, setQuest] = useState<QuestState | null>(null);
   const [settings, setSettings] = useState<Settings>(() => SettingsSystem.load());
   const [loadProgress, setLoadProgress] = useState(0);
   const [loaded, setLoaded] = useState(false);
@@ -82,6 +84,7 @@ export function GameCanvas() {
   const handleGameOver = useCallback(() => setGameOver(true), []);
   const handleVictory = useCallback((data: { ngPlus: number }) => setVictory(data), []);
   const handleComboChange = useCallback((c: number) => setCombo(c), []);
+  const handleQuestUpdate = useCallback((q: QuestState | null) => setQuest(q), []);
   const handleXpChange = useCallback(
     (data: { xp: number; level: number; nextLevelXp: number | null }) => {
       setXp(data.xp);
@@ -166,6 +169,7 @@ export function GameCanvas() {
     game.events.on(GAME_EVENTS.LEVEL_UP_CHOICE, handleLevelUpChoice);
     game.events.on(GAME_EVENTS.VICTORY, handleVictory);
     game.events.on(GAME_EVENTS.COMBO_CHANGE, handleComboChange);
+    game.events.on(GAME_EVENTS.QUEST_UPDATE, handleQuestUpdate);
 
     return () => {
       game.events.off(GAME_EVENTS.HP_CHANGE, handleHpChange);
@@ -186,6 +190,7 @@ export function GameCanvas() {
       game.events.off(GAME_EVENTS.LEVEL_UP_CHOICE, handleLevelUpChoice);
       game.events.off(GAME_EVENTS.VICTORY, handleVictory);
       game.events.off(GAME_EVENTS.COMBO_CHANGE, handleComboChange);
+      game.events.off(GAME_EVENTS.QUEST_UPDATE, handleQuestUpdate);
       game.destroy(true);
       gameRef.current = null;
     };
@@ -208,6 +213,7 @@ export function GameCanvas() {
     handleLevelUpChoice,
     handleVictory,
     handleComboChange,
+    handleQuestUpdate,
     gameStarted,
   ]);
 
@@ -269,6 +275,7 @@ export function GameCanvas() {
         shieldCharges={shieldCharges}
         bossHp={bossHp}
         combo={combo}
+        quest={quest}
         onUsePotion={handleUsePotion}
       />
       {settings.showTouchControls && !dialog && <TouchControls />}

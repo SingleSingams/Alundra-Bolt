@@ -6,6 +6,7 @@ import {
   ZoneId,
   ZONES,
   MinimapData,
+  QuestState,
 } from '../game/constants';
 import { Map, Backpack } from 'lucide-react';
 
@@ -289,10 +290,11 @@ interface HUDProps {
   shieldCharges: number;
   bossHp: { hp: number; maxHp: number; phase: number } | null;
   combo?: number;
+  quest?: QuestState | null;
   onUsePotion?: () => void;
 }
 
-export function HUD({ hp, maxHp, inventory, zone, xp, level, nextLevelXp, minimapData, showHints, showTouchControls, shieldCharges, bossHp, combo, onUsePotion }: HUDProps) {
+export function HUD({ hp, maxHp, inventory, zone, xp, level, nextLevelXp, minimapData, showHints, showTouchControls, shieldCharges, bossHp, combo, quest, onUsePotion }: HUDProps) {
   const fullHearts = Math.floor(hp / 2);
   const hasHalf = hp % 2 === 1;
   const totalSlots = Math.ceil(maxHp / 2);
@@ -445,6 +447,33 @@ export function HUD({ hp, maxHp, inventory, zone, xp, level, nextLevelXp, minima
               {combo}×
             </div>
             <div className="text-[9px] tracking-widest uppercase font-bold text-stone-400 mt-0.5">Combo</div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Quest badge ── */}
+      {quest && (
+        <div
+          className="absolute pointer-events-none select-none"
+          style={{
+            top: 'calc(max(0.5rem, env(safe-area-inset-top)) + 3.5rem)',
+            left: 'max(0.5rem, env(safe-area-inset-left))',
+          }}
+        >
+          <div className="bg-stone-900/80 backdrop-blur-sm border border-amber-700/50 rounded-xl px-2.5 py-1.5 shadow-lg max-w-[180px]">
+            <div className="text-[8px] font-bold tracking-widest text-amber-500/80 uppercase mb-1">Aufgabe</div>
+            <div className="text-[11px] text-amber-100 font-medium leading-tight">{quest.label}</div>
+            {quest.goal > 1 && (
+              <div className="mt-1 flex items-center gap-1.5">
+                <div className="flex-1 h-1 rounded-full bg-stone-700/60 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-amber-500 transition-all duration-500"
+                    style={{ width: `${Math.min((quest.progress / quest.goal) * 100, 100)}%` }}
+                  />
+                </div>
+                <span className="text-[9px] font-mono text-stone-400 shrink-0">{quest.progress}/{quest.goal}</span>
+              </div>
+            )}
           </div>
         </div>
       )}

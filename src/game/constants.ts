@@ -71,6 +71,7 @@ export const GAME_EVENTS = {
   LEVEL_UP_CHOSEN: 'level-up-chosen',
   VICTORY: 'victory',
   COMBO_CHANGE: 'combo-change',
+  QUEST_UPDATE: 'quest-update',
 } as const;
 
 export const NG_PLUS_HP_MULT = 1.5;
@@ -135,6 +136,12 @@ export interface DialogPayload {
   lines: string[];
   portrait?: string;
   portraitColumns?: number; // columns in the pose sheet (3 for 3×2 sheets, 4 for 4×4 sheets)
+}
+
+export interface QuestState {
+  label: string;
+  progress: number;
+  goal: number;
 }
 
 export const ZONE_BOB_FREQ: Record<string, number> = {

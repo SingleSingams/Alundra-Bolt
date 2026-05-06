@@ -41,7 +41,7 @@ export class LoadingScene extends Phaser.Scene {
     }
 
     // Enemy sprites (4×4 grid, 256px frames, RGBA)
-    const enemySprites = ['enemy-goblin', 'enemy-orc', 'enemy-rat'];
+    const enemySprites = ['enemy-goblin', 'enemy-orc', 'enemy-rat', 'enemy-dark-dragon', 'enemy-red-dragon'];
     for (const key of enemySprites) {
       this.load.spritesheet(key, `assets/${key}.png`, {
         frameWidth: 256,
@@ -113,7 +113,7 @@ export class LoadingScene extends Phaser.Scene {
     });
 
     // Enemy sprites — static frame 0
-    for (const key of ['enemy-goblin', 'enemy-orc', 'enemy-rat']) {
+    for (const key of ['enemy-goblin', 'enemy-orc', 'enemy-rat', 'enemy-dark-dragon', 'enemy-red-dragon']) {
       if (this.textures.exists(key)) {
         this.anims.create({ key: `${key}-idle`, frames: [{ key, frame: 0 }], frameRate: 1, repeat: -1 });
       }
