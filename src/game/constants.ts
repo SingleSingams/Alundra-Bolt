@@ -95,12 +95,23 @@ export const GAME_EVENTS = {
 export const NG_PLUS_HP_MULT = 1.5;
 export const NG_PLUS_DAMAGE_MULT = 1.25;
 
-export type LevelUpSkill = 'hp_up' | 'attack_up' | 'shield' | 'xp_boost' | 'speed_up';
+export type LevelUpSkill = 'hp_up' | 'attack_up' | 'shield' | 'xp_boost' | 'speed_up' | 'double_shot' | 'vampire' | 'dash';
 
 export interface LevelUpChoice {
   skills: LevelUpSkill[];
   chosen: LevelUpSkill[];
 }
+
+export const SKILL_DESCRIPTIONS: Record<LevelUpSkill, string> = {
+  hp_up:       '+2 maximale HP',
+  attack_up:   '+2 Nahkampfschaden',
+  shield:      '+1 Schild-Ladung',
+  xp_boost:    '+20 XP sofort',
+  speed_up:    '+15% Bewegungsgeschwindigkeit',
+  double_shot: 'Schießt immer 2 Projektile (±12°)',
+  vampire:     'Trefferheilung +1 HP (max. alle 3s)',
+  dash:        'Shift: 300ms Unverwundbarkeit + Dash (8s CD)',
+};
 
 export const SKILL_SYNERGIES: Array<{
   requires: LevelUpSkill[];
@@ -110,6 +121,8 @@ export const SKILL_SYNERGIES: Array<{
   { requires: ['attack_up', 'attack_up'], label: 'Durchdringende Schüsse', desc: 'Projektile treffen 2 Feinde' },
   { requires: ['attack_up', 'shield'],    label: 'Parrier-Meister',        desc: 'Blocken gibt +3 XP' },
   { requires: ['xp_boost', 'hp_up'],      label: 'Heilsame Tränke',        desc: 'Tränke heilen +2 extra' },
+  { requires: ['double_shot', 'attack_up'], label: 'Sturmschütze',          desc: 'Doppelschuss durchdringt 1 Feind' },
+  { requires: ['vampire', 'hp_up'],         label: 'Lebenshunger',          desc: 'Trefferheilung +2 HP statt 1' },
 ];
 
 export interface MinimapDot {

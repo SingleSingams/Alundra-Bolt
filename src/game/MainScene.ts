@@ -112,6 +112,11 @@ export class MainScene extends Phaser.Scene {
   private piercingShots = 0;
   private parryXpBonus = 0;
   private enhancedPotions = false;
+  private doubleShot = false;
+  private vampireActive = false;
+  private vampireCooldown = 0;
+  private vampireHealAmount = 1;
+  private dashUnlocked = false;
   private juice!: JuiceHelper;
   private bossIntroShown = false;
   private questKills = 0;
@@ -597,6 +602,11 @@ export class MainScene extends Phaser.Scene {
         this.juice.showDamageNumber(enemy.x, enemy.y - 10, this.currentAttackDamage, false);
         this.juice.triggerFreezeFrame(50);
         this.incrementCombo();
+        if (this.vampireActive && this.vampireCooldown <= 0) {
+          this.player.heal(this.vampireHealAmount);
+          this.vampireCooldown = 3000;
+          this.juice.showDamageNumber(this.player.x, this.player.y - 20, this.vampireHealAmount, true);
+        }
       },
       undefined, this
     );
@@ -725,6 +735,8 @@ export class MainScene extends Phaser.Scene {
       if (syn.label === 'Durchdringende Schüsse' && this.piercingShots < 2) this.piercingShots = 2;
       else if (syn.label === 'Parrier-Meister' && this.parryXpBonus === 0) this.parryXpBonus = 3;
       else if (syn.label === 'Heilsame Tränke' && !this.enhancedPotions) this.enhancedPotions = true;
+      else if (syn.label === 'Sturmschütze' && this.piercingShots < 1) this.piercingShots = 1;
+      else if (syn.label === 'Lebenshunger') this.vampireHealAmount = 2;
     }
   }
 
@@ -817,6 +829,9 @@ export class MainScene extends Phaser.Scene {
     this.cameras.main.shake(200, 0.006);
     this.saveCurrentState();
     const allSkills: LevelUpSkill[] = ['hp_up', 'attack_up', 'shield', 'xp_boost', 'speed_up'];
+    if (!this.doubleShot) allSkills.push('double_shot');
+    if (this.level >= 3 && !this.vampireActive) allSkills.push('vampire');
+    if (this.level >= 3 && !this.dashUnlocked) allSkills.push('dash');
     const choices = allSkills.sort(() => Math.random() - 0.5).slice(0, 3);
     this.scene.pause();
     this.game.events.emit(GAME_EVENTS.LEVEL_UP_CHOICE, { skills: choices, chosen: [...this.chosenSkills] });
@@ -831,6 +846,9 @@ export class MainScene extends Phaser.Scene {
       case 'shield': this.player.addShield(); break;
       case 'xp_boost': this.gainXp(20); break;
       case 'speed_up': this.player.applySpeedBoost(1.15); break;
+      case 'double_shot': this.doubleShot = true; break;
+      case 'vampire': this.vampireActive = true; break;
+      case 'dash': this.dashUnlocked = true; break;
     }
     this.checkSynergies();
     this.juice.spawnParticleBurst(this.player.x, this.player.y, 0xfde68a, 18, 90, 550);
@@ -912,8 +930,21 @@ export class MainScene extends Phaser.Scene {
     if (this.player.wantsShoot()) {
       const angle = DIRECTION_ANGLES[this.player.getLastDirection()] ?? 0;
       this.getProjectile(this.player.x, this.player.y, angle, false, this.piercingShots);
+      if (this.doubleShot) {
+        this.getProjectile(this.player.x, this.player.y, angle + 12, false, this.piercingShots);
+        this.getProjectile(this.player.x, this.player.y, angle - 12, false, this.piercingShots);
+      }
       this.player.markShot();
       SoundSystem.playProjectile();
+    }
+
+    if (this.dashUnlocked && this.player.wantsDash()) {
+      this.player.startDash();
+      this.juice.spawnParticleBurst(this.player.x, this.player.y, 0x60a5fa, 8, 40, 250);
+    }
+
+    if (this.vampireActive && this.vampireCooldown > 0) {
+      this.vampireCooldown = Math.max(0, this.vampireCooldown - delta);
     }
 
     if (!this.isTransitioning && !this.player.isDialogActive()) {

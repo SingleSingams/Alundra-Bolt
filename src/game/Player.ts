@@ -33,6 +33,7 @@ interface InputKeys {
   spaceJump: Phaser.Input.Keyboard.Key;
   attackX: Phaser.Input.Keyboard.Key;
   shootY: Phaser.Input.Keyboard.Key;
+  dashShift: Phaser.Input.Keyboard.Key;
 }
 
 const DIRECTION_ANGLES: Record<FacingDirection, number> = {
@@ -68,6 +69,10 @@ export class Player extends Phaser.GameObjects.Container {
   private shieldCharges = 0;
 
   private speedMult = 1.0;
+
+  private dashCooldown = 0;
+  private dashTimer = 0;
+  private dashPressedThisFrame = false;
 
   // Cached per-frame key states — JustDown consumes the flag on first call,
   // so we read it exactly once per key per frame and share the result.
@@ -122,6 +127,7 @@ export class Player extends Phaser.GameObjects.Container {
       spaceJump: kb.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE),
       attackX: kb.addKey(Phaser.Input.Keyboard.KeyCodes.X),
       shootY: kb.addKey(Phaser.Input.Keyboard.KeyCodes.Y),
+      dashShift: kb.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT),
     };
   }
 
@@ -141,6 +147,17 @@ export class Player extends Phaser.GameObjects.Container {
     this.shootPressedThisFrame =
       Phaser.Input.Keyboard.JustDown(this.keys.shootY) ||
       VirtualInput.isShootJustDown();
+    this.dashPressedThisFrame =
+      Phaser.Input.Keyboard.JustDown(this.keys.dashShift);
+
+    if (this.dashCooldown > 0) this.dashCooldown = Math.max(0, this.dashCooldown - delta);
+    if (this.dashTimer > 0) {
+      this.dashTimer = Math.max(0, this.dashTimer - delta);
+      if (this.dashTimer === 0) {
+        this.invincibleTimer = 0;
+        this.speedMult = Math.max(1, this.speedMult / 1.8);
+      }
+    }
 
     if (this.dialogActive || this.frozen) {
       const body = this.body as Phaser.Physics.Arcade.Body;
@@ -505,6 +522,17 @@ export class Player extends Phaser.GameObjects.Container {
 
   applySpeedBoost(mult: number): void {
     this.speedMult *= mult;
+  }
+
+  wantsDash(): boolean {
+    return !this.dialogActive && !this.frozen && this.dashPressedThisFrame && this.dashCooldown <= 0 && this.dashTimer <= 0;
+  }
+
+  startDash(): void {
+    this.dashCooldown = 8000;
+    this.dashTimer = 300;
+    this.invincibleTimer = Math.max(this.invincibleTimer, 300);
+    this.speedMult *= 1.8;
   }
 
   setFrozen(value: boolean): void {

@@ -1,11 +1,14 @@
 import { LevelUpSkill, SKILL_SYNERGIES } from '../game/constants';
 
 const SKILL_META: Record<LevelUpSkill, { label: string; desc: string; icon: string; color: string }> = {
-  hp_up:     { label: 'Lebenskraft',  desc: '+2 max. Herzen sofort geheilt', icon: '❤️', color: 'border-red-500/60 bg-red-950/60 hover:bg-red-900/60' },
-  attack_up: { label: 'Schärfe',      desc: '+2 Nahkampfschaden dauerhaft',  icon: '⚔️', color: 'border-amber-500/60 bg-amber-950/60 hover:bg-amber-900/60' },
-  shield:    { label: 'Schutzschild', desc: '1 Trefferblock sofort',         icon: '🛡️', color: 'border-blue-500/60 bg-blue-950/60 hover:bg-blue-900/60' },
-  xp_boost:  { label: 'Wissensschub', desc: '+20 XP sofort',                 icon: '✨', color: 'border-yellow-400/60 bg-yellow-950/60 hover:bg-yellow-900/60' },
-  speed_up:  { label: 'Eile',         desc: 'Bewegung dauerhaft +15%',       icon: '💨', color: 'border-emerald-500/60 bg-emerald-950/60 hover:bg-emerald-900/60' },
+  hp_up:       { label: 'Lebenskraft',   desc: '+2 max. Herzen sofort geheilt',        icon: '❤️', color: 'border-red-500/60 bg-red-950/60 hover:bg-red-900/60' },
+  attack_up:   { label: 'Schärfe',       desc: '+2 Nahkampfschaden dauerhaft',         icon: '⚔️', color: 'border-amber-500/60 bg-amber-950/60 hover:bg-amber-900/60' },
+  shield:      { label: 'Schutzschild',  desc: '1 Trefferblock sofort',                icon: '🛡️', color: 'border-blue-500/60 bg-blue-950/60 hover:bg-blue-900/60' },
+  xp_boost:    { label: 'Wissensschub',  desc: '+20 XP sofort',                        icon: '✨', color: 'border-yellow-400/60 bg-yellow-950/60 hover:bg-yellow-900/60' },
+  speed_up:    { label: 'Eile',          desc: 'Bewegung dauerhaft +15%',              icon: '💨', color: 'border-emerald-500/60 bg-emerald-950/60 hover:bg-emerald-900/60' },
+  double_shot: { label: 'Doppelschuss',  desc: 'Schießt immer 2 Projektile (±12°)',    icon: '🎯', color: 'border-orange-500/60 bg-orange-950/60 hover:bg-orange-900/60' },
+  vampire:     { label: 'Lebensraub',    desc: 'Treffer heilt +1 HP (max. alle 3s)',   icon: '🧛', color: 'border-purple-500/60 bg-purple-950/60 hover:bg-purple-900/60' },
+  dash:        { label: 'Ausweichrolle', desc: 'Shift: 300ms Unvwnd. + Dash (8s CD)', icon: '💫', color: 'border-cyan-500/60 bg-cyan-950/60 hover:bg-cyan-900/60' },
 };
 
 function getSynergyBadge(skill: LevelUpSkill, chosen: LevelUpSkill[]): string | null {
