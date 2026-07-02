@@ -32,6 +32,7 @@ Two sides with a narrow event-bus bridge:
 - `TextureFactory.ts` — runtime-generated textures (organic grass tileset at 2x, soft radial shadows, path stamps, ground-detail overlay, ore nodes, particles)
 - `InteractionManager.ts` — proximity prompts + interactions for NPCs, chests, resource nodes
 - `SaveSystem.ts` (3 localStorage slots), `SoundSystem.ts` (procedural audio), `SettingsSystem.ts`, `JuiceHelper.ts` (particles/damage numbers/freeze frames), `HapticSystem.ts`, `VirtualInput.ts`
+- `StoryScript.ts` — the complete narrative ("Das Lied von Aelindra"): intro, one-time zone-entry beats, stage-dependent NPC dialog overrides, boss intro/phase-3/farewell lines, epilogue. Story stage (`act1/act2/act3/done`) derives from main-quest flags via `getStoryStage`
 - `constants.ts` — single source for tunables, `GAME_EVENTS` names, shop items, skills/synergies, **`MATERIALS`/`RECIPES`/`RESOURCE_NODE_COUNTS`** (crafting), **`SIDE_QUESTS`**, zone metadata, loot tables
 
 **The bridge contract:** game code emits on `this.game.events` with names from `GAME_EVENTS`; React never reaches into Phaser internals and vice versa. Add new events to `GAME_EVENTS` in `constants.ts` and register/unregister them in `GameCanvas.tsx`.
@@ -41,6 +42,7 @@ Two sides with a narrow event-bus bridge:
 - **Rendering is HD, not pixel art**: assets are 256–1024px illustrations; `GameConfig.ts` sets `pixelArt: false, antialias: true`. Do not re-enable nearest-neighbor filtering. Sprite scales (e.g. `KNIGHT_SCALE` 0.26, `ENEMY_SPRITE_SCALE` 0.145) are tuned to keep detail — avoid extreme downscaling.
 - **Crafting**: gather wood/stone/herb/ore from `ResourceNode`s (Z/Space nearby; they respawn), essence drops from kills. Elara (alchemy) and Torvin (forge) are crafter NPCs (`NPCDefinition.station`); `MainScene.handleCraft` consumes materials and applies `Recipe.output`.
 - **Quests**: linear main quest (kill 5 → find shield → beat boss) tracked in `MainScene` fields; side quests (`SIDE_QUESTS`) activate on first talk to their giver NPC and progress via herb gathering / dragon kills. HUD shows both.
+- **Story**: all narrative text lives in `StoryScript.ts` — never hardcode dialog elsewhere. The hero is named Kael; the twist is that the Void Tyrant is Arthos, Mira's brother and the village's first hero. One-time beats are persisted in `SaveData.seenStoryBeats`; NPC dialogs upgrade per stage via `STORY_NPC_LINES` (fallback: `ZoneConfigs` lines). After the boss dies, `pendingVictory` delays the victory screen until Arthos' farewell dialog is closed. Keep new content consistent with this arc (foreshadowing: Lina's song, the humming tyrant, the cradled shield).
 - **Depth sorting**: ground objects set `depth` to their y coordinate (re-applied each update for movers).
 - **Dialog close**: closing a dialog sets a 300ms `interactCooldown` on the player so the same Z/Space keypress can't instantly reopen the next dialog.
 

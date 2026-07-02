@@ -17,6 +17,8 @@ export interface SaveData {
   materials: Partial<Record<MaterialId, number>>;
   /** side quest id → progress; -1 = completed & rewarded */
   sideQuests: Record<string, number>;
+  /** ids of one-time story dialogs the player has already seen */
+  seenStoryBeats: string[];
 }
 
 export interface SlotPreview {
@@ -48,6 +50,7 @@ const defaults: SaveData = {
   questBossKilled: false,
   materials: {},
   sideQuests: {},
+  seenStoryBeats: [],
 };
 
 function parseSlot(slot: number): SaveData | null {
@@ -71,6 +74,7 @@ function parseSlot(slot: number): SaveData | null {
       questBossKilled: p.questBossKilled ?? defaults.questBossKilled,
       materials: p.materials ?? defaults.materials,
       sideQuests: p.sideQuests ?? defaults.sideQuests,
+      seenStoryBeats: p.seenStoryBeats ?? defaults.seenStoryBeats,
     };
   } catch {
     return null;

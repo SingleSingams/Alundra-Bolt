@@ -1,5 +1,6 @@
 import * as Phaser from 'phaser';
 import { GAME_EVENTS, WORLD_WIDTH, WORLD_HEIGHT } from './constants';
+import { BOSS_PHASE3_LINE } from './StoryScript';
 
 export const BOSS_MAX_HP = 20;
 const BOSS_SPEED_P1 = 58;
@@ -275,7 +276,7 @@ export class Boss extends Phaser.GameObjects.Container {
     this.nameLabel.setColor('#a78bfa');
     this.scene.game.events.emit('boss-phase-3', {
       x: this.x, y: this.y,
-      line: 'Jetzt zeige ich dir wahre Finsternis...',
+      line: BOSS_PHASE3_LINE,
     });
   }
 

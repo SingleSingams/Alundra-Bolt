@@ -60,9 +60,9 @@ export const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
         x: cx - 100,
         y: cy - 120,
         lines: [
-          'Ah, ein Fremder. Die Taverne ist geöffnet, falls du rasten willst.',
-          'Aber wenn du weiterreist — der Wald im Osten ist verflucht. Das sage ich aus Erfahrung.',
-          'Werde stark. Besiege Bestien. Öffne Truhen. Nur so hast du eine Chance gegen das, was in der Tiefe wartet.',
+          'Ah, der neue Ritter! Ich hatte auch mal ein Schwert. Dann kam der Rücken.',
+          'Ein Rat vom alten Magnus: Ein Held ohne Frühstück ist nur ein trauriger Mann in Metall.',
+          'Komm lebend wieder, dann geht das erste Bier aufs Haus. Das zweite nicht. Ich bin alt, nicht großzügig.',
         ],
       },
       {
@@ -73,9 +73,9 @@ export const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
         x: cx + 20,
         y: cy + 10,
         lines: [
-          'Willkommen in Aelindra, dem letzten friedlichen Ort vor dem Dunkel.',
-          'Dieses Dorf steht seit hundert Jahren — aber die Schatten werden jeden Tag näher.',
-          'Im Wald östlich gibt es eine versteckte Wand. Dahinter liegt, was du brauchst. Such danach.',
+          'Kael. Gut, dass du da bist. Die Schatten im Osten werden dreister — gestern haben sie Brams Wäsche von der Leine gestohlen. Er behauptet, es war der Wind. Der Wind trägt keine Unterhosen, Kael.',
+          'Besiege fünf von ihnen im Wald, damit die Leute wieder schlafen können. Danach reden wir weiter.',
+          'Und sei vorsichtig. Ich habe schon einmal jemanden in diesen Osten geschickt. (Sie schaut weg.) Geh jetzt.',
         ],
       },
       {
@@ -87,9 +87,9 @@ export const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
         x: cx + 200,
         y: cy - 180,
         lines: [
-          'Halt! ... Oh, kein Feind. Entschuldige, bin etwas angespannt.',
-          'Ich bewache seit Wochen den Dorfeingang. Letzte Nacht sah ich Schatten aus dem Wald kommen.',
-          'Wenn du nach Osten reist — pass auf. Und komm lebend zurück.',
+          'Halt! Wer da?! ... Oh. Kael. Entschuldige. Ich habe heute Nacht 37 Schatten gezählt. Einer davon war meiner, aber die anderen 36 waren ECHT.',
+          'Mira sagt, ich soll weniger Kaffee trinken. Ich sage, die Schatten sollen weniger huschen. Wort gegen Wort.',
+          'Wenn du in den Wald gehst: Drachen mögen keine spitzen Gegenstände. Sagt mein Großvater. Er hatte nur noch ein Bein, aber SEHR feste Meinungen.',
         ],
       },
       {
@@ -133,9 +133,9 @@ export const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
         x: cx - 120,
         y: cy + 80,
         lines: [
-          'Dieser Wald ist in letzter Zeit düster geworden... die Schatten regen sich mit etwas Uraltem.',
-          'Ich habe Schreie jenseits der Verlies-Tore gehört. Kehr um, solange du noch kannst.',
-          'Wenn du darauf bestehst — finde jedes Schwertupgrade, das du kannst. Du wirst es brauchen.',
+          'Ich wandere seit vierzig Jahren durch diesen Wald. Er war nie freundlich. Aber seit einer Weile ist er... höflich. Wie ein Raubtier, das wartet.',
+          'Kennst du die Geschichte vom Ersten Ritter? Arthos zog vor hundert Jahren durch genau diesen Wald. Selbe Richtung wie du.',
+          'Er kam nie zurück. Aber die Leere blieb hundert Jahre hinter ihren Toren. Erklär mir DAS mal, Ritter.',
         ],
       },
       {
@@ -146,9 +146,9 @@ export const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
         x: cx + 140,
         y: cy - 100,
         lines: [
-          'H-hallo? Bitte erschreck mich nicht... ich habe mich hier verlaufen.',
-          'Da drüben... ich habe ein kleines Monster gesehen. Es hatte Flügel und rote Augen!',
-          'Sei vorsichtig, bitte. Ich will, dass du heil zurückkommst.',
+          'Psst! Nicht so laut. Die Bäume erzählen sich hier Geheimnisse, weißt du.',
+          '(Sie summt eine Melodie.) Das Lied? Das hat mir die alte Frau im Dorf beigebracht. Es macht die Schatten weicher. Die mögen das, glaube ich.',
+          'Du hast ein nettes Gesicht. Versprich, dass du zurückkommst. Die mit den netten Gesichtern kommen nicht immer zurück.',
         ],
       },
       {
@@ -159,9 +159,9 @@ export const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
         x: cx - 60,
         y: cy + 180,
         lines: [
-          'Ich kenne jeden Baum hier... kannte. Jetzt erkenne ich meinen eigenen Wald kaum noch.',
-          'Die Kreaturen wurden in den letzten Wochen wilder — als ob etwas sie antreibt.',
-          'Ihr Lager ist irgendwo südlich. Pass auf dich auf, Fremder.',
+          'Ich kannte hier jeden Baum beim Namen. Der da drüben ist Gerhard.',
+          'Gerhard sieht schlecht aus in letzter Zeit. Alle sehen schlecht aus. Sogar die Pilze wirken bedrückt, und Pilze sind normalerweise sehr gefasste Wesen.',
+          'Pass im Osten auf dich auf. Und wenn du Gerhard etwas antust, finde ich es heraus.',
         ],
       },
       {
@@ -172,9 +172,9 @@ export const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
         x: cx - 20,
         y: cy + 210,
         lines: [
-          'Ich... ich konnte kaum entkommen. Das Verlies ist ein einziger Albtraum.',
-          'Meine Kameraden sind nicht mehr rausgekommen. Du bist mutiger als ich.',
-          'Wenn du hineingehen willst — such nach einem Schild-Fragment. Du wirst jeden Schutz brauchen.',
+          'Wir waren zu sechst. Ich bin der, der weggerannt ist.',
+          'Die anderen... das Ding hat sie nicht einmal gehasst. Es hat gekämpft wie jemand, der schläft und nicht aufwachen will.',
+          'Nenn mich Feigling — ich nenne mich auch so. Aber ich habe gesehen, wie es das Schild eines Toten aufhob und es GEWIEGT hat, Ritter. Wie ein Kind. Geh da nicht rein.',
         ],
       },
     ],
@@ -209,9 +209,9 @@ export const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
         x: cx + 80,
         y: cy - 80,
         lines: [
-          '...höre meine Warnung... Ich wagte mich hinein und entkam nur knapp mit dem Leben.',
-          'Hinter diesem Tor liegt ein Labyrinth — und tiefer darin wartet etwas Schreckliches.',
-          'Der Leere-Tyrann... uralt, unerbittlich. Überlebе zuerst das Innere. Dann stell dich deinem Schicksal.',
+          'Ich habe den Tyrannen gesehen und lebe. Weißt du, warum? Er hat mich angesehen — und dann durch mich hindurch. Als würde er jemand anderen suchen.',
+          'Hinter diesem Tor liegt ein Labyrinth, und tiefer darin wartet er.',
+          'Geh nur hinein, wenn du bereit bist, das zu finden, was du findest. Das ist nicht dasselbe wie das, was du suchst.',
         ],
       },
       {
@@ -222,9 +222,9 @@ export const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
         x: cx - 150,
         y: cy + 120,
         lines: [
-          'Bitte... hilf mir... der Tyrann hält uns hier gefangen seit Wochen.',
-          'Ich weiß nicht wie viele von uns noch leben. Die Dunkelheit frisst alles hier.',
-          'Ich kann nicht kämpfen — aber ich kann dir sagen: das Schild im Ostflügel ist echt. Schnapp es dir.',
+          'Er sperrt uns ein — aber dann vergisst er uns. Manchmal bringt uns die Dunkelheit Wasser. Frag mich nicht, wie das funktioniert.',
+          'Nachts hört man ihn durch die Gänge gehen. Er summt, Ritter. Ein Monster, das summt. Ich habe Angst davor — und manchmal muss ich davon weinen, und ich weiß nicht, warum.',
+          'Das Schild im Ostflügel ist echt, hinter der brüchigen Wand. Hol es dir. Und dann beende das hier — so oder so.',
         ],
       },
     ],
@@ -263,9 +263,9 @@ export const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
         x: cx + 100,
         y: cy - 80,
         lines: [
-          'Du... hast es so weit geschafft. Ich bewundere deinen Mut.',
-          'Der Tyrann ist dort hinten. Er ist... anders als erwartet.',
-          'Pass auf seinen Schattenstoß auf. Er teleportiert sich kurz bevor er angreift.',
+          'Du bist weit gekommen. Weiter als ich.',
+          'Er hätte mich töten können. Stattdessen hat er mein Schild angestarrt — MEIN Schild, ein einfaches Ding aus Eichenholz — und ist einfach gegangen.',
+          'Was auch immer dort hinten wartet: Es kämpft nicht gegen dich. Es kämpft gegen etwas in sich. Er teleportiert sich, kurz bevor er zustößt — nutze das. Oder erlöse ihn.',
         ],
       },
       {
@@ -276,9 +276,9 @@ export const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
         x: cx - 100,
         y: cy + 100,
         lines: [
-          'Endlich — ich dachte, niemand käme mehr.',
-          'Ich habe einen Schutzzauber gewirkt, aber meine Kräfte schwinden.',
-          'Nimm dies als Erinnerung mit: Angriff und Verteidigung im Wechsel.',
+          'Mein Schutzzauber hält diese Kammer. Er hält, glaube ich, weil das Wesen ihn halten LÄSST. Es will nicht, dass wir sterben. Denk darüber nach.',
+          'Die Leere hat kein Herz, sagen die Bücher. Aber ich habe eines schlagen hören, dort hinten. Langsam. Müde. Hundert Jahre müde.',
+          'Was auch immer du dort erlöst: Sei sanft dabei, wenn du kannst. Und schnell, wenn du musst.',
         ],
       },
     ],

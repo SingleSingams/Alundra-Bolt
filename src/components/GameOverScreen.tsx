@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { SaveSystem } from '../game/SaveSystem';
 import { ZONES, ZoneId } from '../game/constants';
 import { submitScore, fetchTopScores, supabaseConfigured, Score } from '../lib/scores';
+import { GAME_OVER_FLAVOR } from '../game/StoryScript';
 
 interface Props {
   isOpen: boolean;
@@ -62,6 +63,7 @@ export function GameOverScreen({ isOpen, level, xp, zone }: Props) {
           <h1 className="text-5xl font-mono font-bold text-red-400 tracking-widest uppercase drop-shadow-lg">
             Game Over
           </h1>
+          <p className="text-stone-400 text-xs font-mono italic pt-1">{GAME_OVER_FLAVOR}</p>
         </div>
 
         {/* Stats */}

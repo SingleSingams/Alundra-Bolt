@@ -30,6 +30,8 @@ export interface InteractionCallbacks {
   onShieldQuestFound(): void;
   onNpcTalked(npcId: string): void;
   openCrafting(npc: NPC): void;
+  /** Story-stage-dependent dialog override; null = use the NPC's base lines. */
+  getNpcLines(npcId: string): string[] | null;
   getInventory(): InventoryItem[];
   getProjectileDamage(): number;
   setProjectileDamage(v: number): void;
@@ -182,7 +184,7 @@ export class InteractionManager {
     }
     const payload: DialogPayload = {
       npcName: npc.npcName,
-      lines: npc.lines,
+      lines: this.cb.getNpcLines(npc.npcId) ?? npc.lines,
       portrait: npc.portrait,
       portraitColumns: npc.portraitColumns,
     };

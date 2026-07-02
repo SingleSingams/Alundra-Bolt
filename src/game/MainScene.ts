@@ -65,6 +65,16 @@ import {
   SideQuestState,
 } from './constants';
 import { ResourceNode, ResourceKind } from './ResourceNode';
+import {
+  getStoryStage,
+  INTRO_LINES,
+  ZONE_ENTRY_BEATS,
+  SHIELD_REVELATION,
+  STORY_NPC_LINES,
+  BOSS_INTRO,
+  ARTHOS_FAREWELL,
+  StoryBeat,
+} from './StoryScript';
 import { SaveSystem } from './SaveSystem';
 import { Boss } from './Boss';
 import { Projectile } from './Projectile';
@@ -139,8 +149,9 @@ export class MainScene extends Phaser.Scene {
   private vampireHealAmount = 1;
   private dashUnlocked = false;
   private juice!: JuiceHelper;
-  private bossIntroShown = false;
   private atmosphere!: AtmosphereSystem;
+  private seenStoryBeats = new Set<string>();
+  private pendingVictory: { ngPlus: number; level: number; xp: number } | null = null;
   private questKills = 0;
   private questShieldFound = false;
   private questBossKilled = false;
@@ -205,7 +216,12 @@ export class MainScene extends Phaser.Scene {
             this.questShieldFound = true;
             this.emitQuestState();
             this.game.events.emit(GAME_EVENTS.QUEST_COMPLETE, 'Schild-Fragment gefunden!');
+            this.time.delayedCall(700, () => this.showStoryBeat(SHIELD_REVELATION));
           }
+        },
+        getNpcLines: (npcId) => {
+          const stage = getStoryStage(this.questKills, this.questShieldFound, this.questBossKilled);
+          return STORY_NPC_LINES[npcId]?.[stage] ?? null;
         },
         getInventory: () => this.inventory,
         getProjectileDamage: () => this.currentProjectileDamage,
@@ -237,6 +253,7 @@ export class MainScene extends Phaser.Scene {
       this.questBossKilled = save.questBossKilled ?? false;
       this.materials = save.materials ?? {};
       this.sideQuests = save.sideQuests ?? {};
+      this.seenStoryBeats = new Set(save.seenStoryBeats ?? []);
       this.recalculateAttackDamage();
       this.checkSynergies();
       this.emitInventoryChange();
@@ -253,19 +270,13 @@ export class MainScene extends Phaser.Scene {
       });
       this.game.events.emit(GAME_EVENTS.SHIELD_CHANGE, 0);
       this.time.delayedCall(900, () => {
-        const introPaylod: DialogPayload = {
+        const introPayload: DialogPayload = {
           npcName: 'Mira die Dorfälteste',
           portrait: 'assets/portraits/elder-woman.png',
-          lines: [
-            'Willkommen, Ritter. Ich bin froh, dass du gekommen bist — wir brauchen dich.',
-            'Im Osten breitet sich das Dunkel aus. Der Leere-Tyrann erwacht nach hundert Jahren.',
-            'Deine Aufgabe: besiege seine Diener im Wald, finde das Schild im Verlies, und stelle dich dem Tyrannen selbst.',
-            'Sammle unterwegs Holz, Stein und Kräuter — Elara braut dir Tränke, und Schmied Torvin verstärkt deine Waffen.',
-            'Und sprich mit den Leuten hier. Manche haben Aufgaben, die dich stärker machen. Viel Glück, Held von Aelindra.',
-          ],
+          lines: INTRO_LINES,
         };
         this.player.setDialogActive(true);
-        this.game.events.emit(GAME_EVENTS.DIALOG_OPEN, introPaylod);
+        this.game.events.emit(GAME_EVENTS.DIALOG_OPEN, introPayload);
       });
     }
 
@@ -274,7 +285,14 @@ export class MainScene extends Phaser.Scene {
     this.emitSideQuests();
     this.useItemKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E);
 
-    this.game.events.on(GAME_EVENTS.DIALOG_CLOSE, () => this.interactionMgr.closeDialog(), this);
+    this.game.events.on(GAME_EVENTS.DIALOG_CLOSE, () => {
+      this.interactionMgr.closeDialog();
+      if (this.pendingVictory) {
+        const data = this.pendingVictory;
+        this.pendingVictory = null;
+        this.time.delayedCall(400, () => this.game.events.emit(GAME_EVENTS.VICTORY, data));
+      }
+    }, this);
     this.game.events.on(GAME_EVENTS.PLAYER_DAMAGED, this.onPlayerDamaged, this);
     this.game.events.on(GAME_EVENTS.SHIELD_BLOCK, this.onShieldBlock, this);
     this.game.events.on(GAME_EVENTS.PLAYER_ATTACK, () => SoundSystem.playAttack(), this);
@@ -572,8 +590,14 @@ export class MainScene extends Phaser.Scene {
     this.spawnWorldItem(x - 24, y, 'heart_pickup');
     this.spawnWorldItem(x + 24, y, 'heart_pickup');
     this.spawnWorldItem(x, y - 24, 'heart_pickup');
-    this.time.delayedCall(1800, () => {
-      this.game.events.emit(GAME_EVENTS.VICTORY, { ngPlus: this.ngPlus, level: this.level, xp: this.xp });
+    // Arthos' farewell: the emotional payoff. Victory fires once it's closed.
+    this.pendingVictory = { ngPlus: this.ngPlus, level: this.level, xp: this.xp };
+    this.time.delayedCall(1600, () => {
+      if (!this.showStoryBeat(ARTHOS_FAREWELL) && this.pendingVictory) {
+        const data = this.pendingVictory;
+        this.pendingVictory = null;
+        this.game.events.emit(GAME_EVENTS.VICTORY, data);
+      }
     });
   }
 
@@ -629,24 +653,29 @@ export class MainScene extends Phaser.Scene {
         this.isTransitioning = false;
         this.player.setFrozen(false);
         this.saveCurrentState();
-        if (nextZone === 'boss_room' && !this.bossIntroShown) {
-          this.bossIntroShown = true;
-          this.time.delayedCall(500, () => {
-            const bossPayload: DialogPayload = {
-              npcName: 'Der Leere-Tyrann',
-              portrait: 'assets/portraits/void-tyrant.png',
-              lines: [
-                '...Endlich. Ich habe auf dich gewartet, kleiner Ritter.',
-                'Hundert Jahre schlief ich — bis das erste Schwert meinen Schlaf brach.',
-                'Nun stirbst du hier. In der Leere.',
-              ],
-            };
-            this.player.setDialogActive(true);
-            this.game.events.emit(GAME_EVENTS.DIALOG_OPEN, bossPayload);
-          });
+        const beat = nextZone === 'boss_room' ? BOSS_INTRO : ZONE_ENTRY_BEATS[nextZone];
+        if (beat && !this.seenStoryBeats.has(beat.id)) {
+          this.time.delayedCall(500, () => this.showStoryBeat(beat));
         }
       });
     });
+  }
+
+  // ─── Story beats ──────────────────────────────────────────────────────────
+
+  /** Shows a one-time story dialog and remembers it in the save. Returns false if already seen. */
+  private showStoryBeat(beat: StoryBeat): boolean {
+    if (this.seenStoryBeats.has(beat.id)) return false;
+    this.seenStoryBeats.add(beat.id);
+    const payload: DialogPayload = {
+      npcName: beat.npcName,
+      portrait: beat.portrait,
+      lines: beat.lines,
+    };
+    this.player.setDialogActive(true);
+    this.game.events.emit(GAME_EVENTS.DIALOG_OPEN, payload);
+    this.saveCurrentState();
+    return true;
   }
 
   // ─── Persistent colliders ─────────────────────────────────────────────────
@@ -901,6 +930,7 @@ export class MainScene extends Phaser.Scene {
       questBossKilled: this.questBossKilled,
       materials: { ...this.materials },
       sideQuests: { ...this.sideQuests },
+      seenStoryBeats: [...this.seenStoryBeats],
     });
   }
 

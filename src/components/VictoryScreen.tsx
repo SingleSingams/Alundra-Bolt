@@ -1,4 +1,5 @@
 import { SaveSystem } from '../game/SaveSystem';
+import { EPILOGUE, EPILOGUE_TITLE, EPILOGUE_NG_PLUS_HINT } from '../game/StoryScript';
 
 interface Props {
   isOpen: boolean;
@@ -28,6 +29,7 @@ export function VictoryScreen({ isOpen, level, xp, ngPlus }: Props) {
       questBossKilled: false,
       materials: {},
       sideQuests: {},
+      seenStoryBeats: [],
     });
     window.location.reload();
   };
@@ -37,20 +39,33 @@ export function VictoryScreen({ isOpen, level, xp, ngPlus }: Props) {
   };
 
   return (
-    <div className="absolute inset-0 flex flex-col items-center justify-center z-50 bg-black/90 px-6">
-      <div className="w-full max-w-xs space-y-6 text-center">
+    <div className="absolute inset-0 flex flex-col items-center justify-center z-50 bg-black/90 px-6 overflow-y-auto py-8">
+      <div className="w-full max-w-sm space-y-6 text-center">
 
         {/* Title */}
         <div className="space-y-2">
           <p className="text-[10px] font-mono tracking-[0.3em] text-amber-600 uppercase animate-pulse">
-            {ngPlus > 0 ? `New Game+ ${ngPlus} abgeschlossen` : 'Sieg'}
+            {ngPlus > 0 ? `New Game+ ${ngPlus} abgeschlossen` : 'Erlösung'}
           </p>
-          <h1 className="text-5xl font-mono font-bold text-amber-300 tracking-widest drop-shadow-lg">
-            Gewonnen!
+          <h1 className="text-4xl font-mono font-bold text-amber-300 tracking-widest drop-shadow-lg">
+            {EPILOGUE_TITLE}
           </h1>
-          <p className="text-stone-400 text-sm font-mono leading-relaxed">
-            Der Leere-Tyrann ist besiegt.<br />Das Verlies liegt in Trümmern.
-          </p>
+        </div>
+
+        {/* Epilogue */}
+        <div className="bg-stone-900/70 border border-amber-700/40 rounded-xl px-5 py-4 space-y-3 text-left">
+          {EPILOGUE.map((paragraph, i) => (
+            <p
+              key={i}
+              className={
+                i === EPILOGUE.length - 1
+                  ? 'text-amber-200 text-sm leading-relaxed italic text-center'
+                  : 'text-stone-300 text-sm leading-relaxed'
+              }
+            >
+              {paragraph}
+            </p>
+          ))}
         </div>
 
         {/* Stats */}
@@ -77,6 +92,7 @@ export function VictoryScreen({ isOpen, level, xp, ngPlus }: Props) {
         {/* NG+ info */}
         <div className="bg-purple-950/40 border border-purple-700/40 rounded-xl px-4 py-3 text-xs text-purple-300 font-mono text-center space-y-1">
           <div className="font-bold text-purple-200">New Game+</div>
+          <div className="text-purple-300/80 italic">{EPILOGUE_NG_PLUS_HINT}</div>
           <div className="text-stone-400">
             Stärker, schneller, gefährlicher.<br />
             Deine Erfahrung und dein Level bleiben erhalten.
