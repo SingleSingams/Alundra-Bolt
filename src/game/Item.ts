@@ -18,7 +18,7 @@ export class Item extends Phaser.GameObjects.Container {
 
     Item.ensureTextures(scene);
 
-    this.shadow = scene.add.image(0, 9, 'shadow').setAlpha(0.35).setScale(0.7);
+    this.shadow = scene.add.image(0, 10, 'shadow').setAlpha(0.5).setScale(0.4, 0.3);
 
     const textureKey = type === 'chest' ? 'chest-closed' : type === 'potion_pickup' ? 'potion-pickup' : 'heart-pickup';
     this.sprite = scene.add.image(0, 0, textureKey);

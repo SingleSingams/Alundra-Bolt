@@ -90,10 +90,127 @@ export const GAME_EVENTS = {
   COMBO_CHANGE: 'combo-change',
   QUEST_UPDATE: 'quest-update',
   QUEST_COMPLETE: 'quest-complete',
+  SIDE_QUESTS_UPDATE: 'side-quests-update',
   SHOP_OPEN: 'shop-open',
   SHOP_BUY: 'shop-buy',
   SHOP_CLOSE: 'shop-close',
+  CRAFT_OPEN: 'craft-open',
+  CRAFT: 'craft',
+  CRAFT_CLOSE: 'craft-close',
+  MATERIALS_CHANGE: 'materials-change',
 } as const;
+
+// ─── Crafting ────────────────────────────────────────────────────────────────
+
+export type MaterialId = 'wood' | 'stone' | 'herb' | 'ore' | 'essence';
+
+export interface MaterialMeta {
+  id: MaterialId;
+  label: string;
+  icon: string;
+}
+
+export const MATERIALS: Record<MaterialId, MaterialMeta> = {
+  wood:    { id: 'wood',    label: 'Holz',    icon: '🪵' },
+  stone:   { id: 'stone',   label: 'Stein',   icon: '🪨' },
+  herb:    { id: 'herb',    label: 'Kraut',   icon: '🌿' },
+  ore:     { id: 'ore',     label: 'Erz',     icon: '💎' },
+  essence: { id: 'essence', label: 'Essenz',  icon: '✨' },
+};
+
+export const MATERIAL_IDS = Object.keys(MATERIALS) as MaterialId[];
+
+export type CraftStation = 'forge' | 'alchemy';
+
+export type RecipeOutput =
+  | 'potion'
+  | 'sword_upgrade'
+  | 'shield_charge'
+  | 'projectile_upgrade'
+  | 'heal_2'
+  | 'heal_full';
+
+export interface Recipe {
+  id: string;
+  station: CraftStation;
+  label: string;
+  desc: string;
+  icon: string;
+  cost: Partial<Record<MaterialId, number>>;
+  output: RecipeOutput;
+}
+
+export const RECIPES: Recipe[] = [
+  // Schmiede (Torvin)
+  { id: 'sharpen_sword',  station: 'forge',   label: 'Schwert schärfen',   desc: '+2 Nahkampfschaden (dauerhaft)', icon: '⚔️', cost: { ore: 3, wood: 2 },    output: 'sword_upgrade' },
+  { id: 'forge_shield',   station: 'forge',   label: 'Schildladung',       desc: '+1 Schild-Ladung',               icon: '🛡️', cost: { stone: 4, ore: 1 },   output: 'shield_charge' },
+  { id: 'arcane_arrows',  station: 'forge',   label: 'Arkane Geschosse',   desc: '+1 Projektilschaden (dauerhaft)', icon: '⚡', cost: { ore: 2, essence: 2 }, output: 'projectile_upgrade' },
+  // Alchemie (Elara)
+  { id: 'brew_potion',    station: 'alchemy', label: 'Heiltrank brauen',   desc: 'Trank für den Rucksack (+4 HP)', icon: '🧪', cost: { herb: 2 },            output: 'potion' },
+  { id: 'heart_brew',     station: 'alchemy', label: 'Herzenswärmer',      desc: '+2 HP sofort',                   icon: '❤️', cost: { herb: 1, wood: 1 },   output: 'heal_2' },
+  { id: 'elixir',         station: 'alchemy', label: 'Großes Elixier',     desc: 'Volle Heilung sofort',           icon: '🌟', cost: { herb: 3, essence: 2 }, output: 'heal_full' },
+];
+
+/** Resource node spawn counts per zone (kind → count). */
+export const RESOURCE_NODE_COUNTS: Record<ZoneId, Partial<Record<Exclude<MaterialId, 'essence'>, number>>> = {
+  grasslands:       { herb: 5, wood: 4, stone: 2 },
+  forest:           { wood: 6, herb: 4, stone: 3 },
+  dungeon:          { stone: 5, ore: 3 },
+  dungeon_interior: { ore: 5, stone: 3 },
+  boss_room:        {},
+};
+
+export const RESOURCE_RESPAWN_MS = 35000;
+export const RESOURCE_INTERACT_RADIUS = 40;
+/** Chance that a defeated enemy leaves behind magical essence. */
+export const ESSENCE_DROP_CHANCE = 0.35;
+
+// ─── Side quests ─────────────────────────────────────────────────────────────
+
+export type SideQuestKind = 'gather_herb' | 'kill_dragon';
+
+export interface SideQuestDef {
+  id: string;
+  /** NPC id that hands out the quest (see ZoneConfigs npcs). */
+  giver: string;
+  title: string;
+  desc: string;
+  goal: number;
+  kind: SideQuestKind;
+  rewardXp: number;
+  rewardLabel: string;
+}
+
+export const SIDE_QUESTS: SideQuestDef[] = [
+  {
+    id: 'elara_herbs',
+    giver: 'elara',
+    title: 'Elaras Vorräte',
+    desc: 'Sammle 3 Kräuter für die Apothekerin.',
+    goal: 3,
+    kind: 'gather_herb',
+    rewardXp: 12,
+    rewardLabel: '+12 XP & Heiltrank',
+  },
+  {
+    id: 'bram_dragons',
+    giver: 'guard',
+    title: 'Brams Sorge',
+    desc: 'Besiege 2 Drachen für den Dorfwächter.',
+    goal: 2,
+    kind: 'kill_dragon',
+    rewardXp: 30,
+    rewardLabel: '+30 XP & Schild-Ladung',
+  },
+];
+
+export interface SideQuestState {
+  id: string;
+  title: string;
+  progress: number;
+  goal: number;
+  done: boolean;
+}
 
 export type ShopItemId = 'heal_potion' | 'shield_charge' | 'heart' | 'projectile_upgrade';
 

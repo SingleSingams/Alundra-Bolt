@@ -11,7 +11,13 @@ import {
   createParticleTexture,
   createHazardTextures,
   createSecretWallTexture,
+  createGroundDetailTexture,
+  createLightHaloTexture,
+  createSoftParticleTexture,
+  createPathStampTexture,
+  createOreNodeTexture,
 } from './TextureFactory';
+import { AtmosphereSystem } from './AtmosphereSystem';
 import { JuiceHelper } from './JuiceHelper';
 import {
   TILE_SIZE,
@@ -50,7 +56,15 @@ import {
   SHOP_ITEMS,
   HEART_HEAL_AMOUNT,
   POTION_HEAL_AMOUNT,
+  MaterialId,
+  MATERIALS,
+  RECIPES,
+  RESOURCE_NODE_COUNTS,
+  ESSENCE_DROP_CHANCE,
+  SIDE_QUESTS,
+  SideQuestState,
 } from './constants';
+import { ResourceNode, ResourceKind } from './ResourceNode';
 import { SaveSystem } from './SaveSystem';
 import { Boss } from './Boss';
 import { Projectile } from './Projectile';
@@ -93,6 +107,9 @@ export class MainScene extends Phaser.Scene {
   private hazardCooldown = 0;
 
   private inventory: InventoryItem[] = [];
+  private materials: Partial<Record<MaterialId, number>> = {};
+  private sideQuests: Record<string, number> = {};
+  private resourceNodes: ResourceNode[] = [];
   private currentZone: ZoneId = 'grasslands';
   private isTransitioning = false;
   private ambientBreathTime = 0;
@@ -123,6 +140,7 @@ export class MainScene extends Phaser.Scene {
   private dashUnlocked = false;
   private juice!: JuiceHelper;
   private bossIntroShown = false;
+  private atmosphere!: AtmosphereSystem;
   private questKills = 0;
   private questShieldFound = false;
   private questBossKilled = false;
@@ -147,10 +165,21 @@ export class MainScene extends Phaser.Scene {
     createParticleTexture(this);
     createHazardTextures(this);
     createSecretWallTexture(this);
+    createGroundDetailTexture(this);
+    createLightHaloTexture(this);
+    createSoftParticleTexture(this);
+    createPathStampTexture(this);
+    createOreNodeTexture(this);
     Item.ensureTextures(this);
     NPC.ensureTextures(this);
 
+    // Large soft light/dark patches over the tiled ground — breaks repetition
+    const groundDetail = this.add.tileSprite(WORLD_WIDTH / 2, WORLD_HEIGHT / 2, WORLD_WIDTH, WORLD_HEIGHT, 'ground-detail');
+    groundDetail.setDepth(0.02);
+    groundDetail.setAlpha(0.8);
+
     this.juice = new JuiceHelper(this);
+    this.atmosphere = new AtmosphereSystem(this);
 
     this.obstacles = this.physics.add.staticGroup();
     this.treeObstacles = this.physics.add.staticGroup();
@@ -163,9 +192,12 @@ export class MainScene extends Phaser.Scene {
     this.setupPersistentColliders();
 
     this.interactionMgr = new InteractionManager(
-      this.game, this.player, this.items, this.npcs, this.juice,
+      this.game, this.player, this.items, this.npcs, this.resourceNodes, this.juice,
       {
         addToInventory: (item) => this.addToInventory(item),
+        addMaterial: (id, amount) => this.addMaterial(id, amount),
+        onNpcTalked: (npcId) => this.onNpcTalked(npcId),
+        openCrafting: (npc) => this.openCrafting(npc.npcName, npc.station!),
         saveCurrentState: () => this.saveCurrentState(),
         emitQuestState: () => this.emitQuestState(),
         onShieldQuestFound: () => {
@@ -203,6 +235,8 @@ export class MainScene extends Phaser.Scene {
       this.questKills = save.questKills ?? 0;
       this.questShieldFound = save.questShieldFound ?? false;
       this.questBossKilled = save.questBossKilled ?? false;
+      this.materials = save.materials ?? {};
+      this.sideQuests = save.sideQuests ?? {};
       this.recalculateAttackDamage();
       this.checkSynergies();
       this.emitInventoryChange();
@@ -226,6 +260,8 @@ export class MainScene extends Phaser.Scene {
             'Willkommen, Ritter. Ich bin froh, dass du gekommen bist — wir brauchen dich.',
             'Im Osten breitet sich das Dunkel aus. Der Leere-Tyrann erwacht nach hundert Jahren.',
             'Deine Aufgabe: besiege seine Diener im Wald, finde das Schild im Verlies, und stelle dich dem Tyrannen selbst.',
+            'Sammle unterwegs Holz, Stein und Kräuter — Elara braut dir Tränke, und Schmied Torvin verstärkt deine Waffen.',
+            'Und sprich mit den Leuten hier. Manche haben Aufgaben, die dich stärker machen. Viel Glück, Held von Aelindra.',
           ],
         };
         this.player.setDialogActive(true);
@@ -234,6 +270,8 @@ export class MainScene extends Phaser.Scene {
     }
 
     this.emitQuestState();
+    this.emitMaterialsChange();
+    this.emitSideQuests();
     this.useItemKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E);
 
     this.game.events.on(GAME_EVENTS.DIALOG_CLOSE, () => this.interactionMgr.closeDialog(), this);
@@ -244,6 +282,8 @@ export class MainScene extends Phaser.Scene {
     this.game.events.on(GAME_EVENTS.LEVEL_UP_CHOSEN, this.handleSkillChosen, this);
     this.game.events.on(GAME_EVENTS.SHOP_BUY, this.handleShopBuy, this);
     this.game.events.on(GAME_EVENTS.SHOP_CLOSE, () => this.interactionMgr.closeDialog(), this);
+    this.game.events.on(GAME_EVENTS.CRAFT, this.handleCraft, this);
+    this.game.events.on(GAME_EVENTS.CRAFT_CLOSE, () => this.interactionMgr.closeDialog(), this);
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off(GAME_EVENTS.DIALOG_CLOSE, undefined, this);
@@ -254,20 +294,26 @@ export class MainScene extends Phaser.Scene {
       this.game.events.off(GAME_EVENTS.LEVEL_UP_CHOSEN, this.handleSkillChosen, this);
       this.game.events.off(GAME_EVENTS.SHOP_BUY, this.handleShopBuy, this);
       this.game.events.off(GAME_EVENTS.SHOP_CLOSE, undefined, this);
+      this.game.events.off(GAME_EVENTS.CRAFT, this.handleCraft, this);
+      this.game.events.off(GAME_EVENTS.CRAFT_CLOSE, undefined, this);
     });
   }
 
   // ─── Tilemap ──────────────────────────────────────────────────────────────
 
   private buildTilemap(): void {
+    // Tiles are authored at 2x (64px) for crisper detail; the layer is scaled
+    // back to 0.5 so the world stays MAP_WIDTH×MAP_HEIGHT at TILE_SIZE px.
+    const texTile = TILE_SIZE * 2;
     const map = this.make.tilemap({
-      tileWidth: TILE_SIZE, tileHeight: TILE_SIZE,
+      tileWidth: texTile, tileHeight: texTile,
       width: MAP_WIDTH, height: MAP_HEIGHT,
     });
-    const tileset = map.addTilesetImage('grass-tiles', 'grass-tiles', TILE_SIZE, TILE_SIZE, 0, 0, 0);
+    const tileset = map.addTilesetImage('grass-tiles', 'grass-tiles', texTile, texTile, 0, 0, 0);
     if (!tileset) throw new Error('Failed to add tileset');
     const layer = map.createBlankLayer('ground', tileset, 0, 0);
     if (!layer) throw new Error('Failed to create layer');
+    layer.setScale(0.5);
     this.groundLayer = layer;
     const weights = [0, 0, 0, 1, 1, 2, 3, 4];
     for (let y = 0; y < MAP_HEIGHT; y++)
@@ -300,9 +346,11 @@ export class MainScene extends Phaser.Scene {
     placeDecorations(this, this.decorGroup, this.currentZone, protectedTiles);
     if (this.currentZone === 'grasslands') placeVillage(this, this.obstacles, this.decorGroup);
     if (this.currentZone === 'forest') {
-      placeCampfire(this, this.decorGroup, centerX - 50, centerY + 195);
-      placeCampfire(this, this.decorGroup, centerX + 80, centerY + 195);
+      placeCampfire(this, this.decorGroup, centerX - 50, centerY + 195, this.atmosphere);
+      placeCampfire(this, this.decorGroup, centerX + 80, centerY + 195, this.atmosphere);
     }
+    this.atmosphere.applyZone(zone);
+    this.spawnResourceNodes(zone, protectedTiles);
     this.spawnEnemies(config.enemySpawns);
     this.spawnInitialItems(config.heartSpawns);
     if (config.hazardSpawns) spawnHazards(this, this.hazardGroup, config.hazardSpawns);
@@ -347,6 +395,8 @@ export class MainScene extends Phaser.Scene {
     this.items.length = 0;
     for (const npc of this.npcs) npc.destroy();
     this.npcs.length = 0;
+    for (const node of this.resourceNodes) node.destroy();
+    this.resourceNodes.length = 0;
     for (const t of this.transitionZones) t.zone.destroy();
     this.transitionZones.length = 0;
     this.treeGroup.clear(true, true);
@@ -355,6 +405,7 @@ export class MainScene extends Phaser.Scene {
     this.treeObstacles.clear(true, true);
     this.hazardGroup.clear(true, true);
     this.secretWallGroup.clear(true, true);
+    this.atmosphere.clearZone();
     this.interactionMgr?.reset();
   }
 
@@ -375,6 +426,28 @@ export class MainScene extends Phaser.Scene {
       this.physics.add.collider(enemy as any, this.obstacles);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       this.physics.add.collider(enemy as any, this.treeObstacles);
+    }
+  }
+
+  // ─── Resource nodes ───────────────────────────────────────────────────────
+
+  private spawnResourceNodes(zone: ZoneId, protectedTiles: Set<string>): void {
+    const counts = RESOURCE_NODE_COUNTS[zone];
+    const margin = 4;
+    for (const [kind, count] of Object.entries(counts) as Array<[ResourceKind, number]>) {
+      for (let i = 0; i < count; i++) {
+        let attempts = 0;
+        while (attempts++ < 24) {
+          const tx = Phaser.Math.Between(margin, MAP_WIDTH - margin);
+          const ty = Phaser.Math.Between(margin, MAP_HEIGHT - margin);
+          if (protectedTiles.has(`${tx},${ty}`)) continue;
+          const px = tx * TILE_SIZE + TILE_SIZE / 2;
+          const py = ty * TILE_SIZE + TILE_SIZE / 2;
+          if (Math.abs(px - centerX) < 110 && Math.abs(py - centerY) < 110) continue;
+          this.resourceNodes.push(new ResourceNode(this, px, py, kind));
+          break;
+        }
+      }
     }
   }
 
@@ -678,6 +751,13 @@ export class MainScene extends Phaser.Scene {
     if (enemyId) this.killedEnemyIds.add(enemyId);
     this.enemies = this.enemies.filter((e) => !e.isDying() && e.active);
     if (Math.random() < CHEST_DROP_CHANCE) this.spawnWorldItem(x, y, 'chest');
+    if (Math.random() < ESSENCE_DROP_CHANCE) {
+      this.addMaterial('essence', 1);
+      this.juice.showFloatingText(x, y - 18, `+1 ${MATERIALS.essence.label} ✨`, '#e9d5ff');
+    }
+    if (enemyType === 'dragon' || enemyType === 'dragon-red') {
+      this.progressSideQuests('kill_dragon');
+    }
     this.gainXpWithCombo(XP_BY_ENEMY_TYPE[enemyType ?? ''] ?? XP_PER_ENEMY);
     SoundSystem.playEnemyDeath();
     HapticSystem.death();
@@ -819,6 +899,8 @@ export class MainScene extends Phaser.Scene {
       questKills: this.questKills,
       questShieldFound: this.questShieldFound,
       questBossKilled: this.questBossKilled,
+      materials: { ...this.materials },
+      sideQuests: { ...this.sideQuests },
     });
   }
 
@@ -914,12 +996,118 @@ export class MainScene extends Phaser.Scene {
     this.game.events.emit(GAME_EVENTS.INVENTORY_CHANGE, [...this.inventory]);
   }
 
+  // ─── Materials & crafting ─────────────────────────────────────────────────
+
+  private addMaterial(id: MaterialId, amount: number): void {
+    this.materials[id] = (this.materials[id] ?? 0) + amount;
+    if (id === 'herb' && amount > 0) this.progressSideQuests('gather_herb');
+    this.emitMaterialsChange();
+    this.saveCurrentState();
+  }
+
+  private emitMaterialsChange(): void {
+    this.game.events.emit(GAME_EVENTS.MATERIALS_CHANGE, { ...this.materials });
+  }
+
+  private openCrafting(npcName: string, station: 'forge' | 'alchemy'): void {
+    this.game.events.emit(GAME_EVENTS.CRAFT_OPEN, {
+      npcName,
+      station,
+      materials: { ...this.materials },
+    });
+  }
+
+  private handleCraft(data: { recipeId: string; npcName: string }): void {
+    const recipe = RECIPES.find(r => r.id === data.recipeId);
+    if (!recipe) return;
+    for (const [mat, needed] of Object.entries(recipe.cost) as Array<[MaterialId, number]>) {
+      if ((this.materials[mat] ?? 0) < needed) return;
+    }
+    for (const [mat, needed] of Object.entries(recipe.cost) as Array<[MaterialId, number]>) {
+      this.materials[mat] = (this.materials[mat] ?? 0) - needed;
+    }
+    switch (recipe.output) {
+      case 'potion':             this.addToInventory('potion'); break;
+      case 'sword_upgrade':      this.addToInventory('sword_upgrade'); break;
+      case 'shield_charge':      this.player.addShield(); break;
+      case 'projectile_upgrade': this.currentProjectileDamage += 1; break;
+      case 'heal_2':             this.player.heal(2); SoundSystem.playHeal(); break;
+      case 'heal_full':          this.player.setHp(MAX_HP); SoundSystem.playHeal(); break;
+    }
+    SoundSystem.playChestOpen();
+    this.juice.spawnParticleBurst(this.player.x, this.player.y, 0xfde68a, 12, 60, 420);
+    this.juice.showFloatingText(this.player.x, this.player.y - 24, recipe.label, '#fde68a');
+    this.emitMaterialsChange();
+    this.saveCurrentState();
+    // refresh the open crafting screen with the new material counts
+    this.openCrafting(data.npcName, recipe.station);
+  }
+
+  // ─── Side quests ──────────────────────────────────────────────────────────
+
+  private onNpcTalked(npcId: string): void {
+    let changed = false;
+    for (const quest of SIDE_QUESTS) {
+      if (quest.giver !== npcId) continue;
+      if (this.sideQuests[quest.id] !== undefined) continue;
+      this.sideQuests[quest.id] = 0;
+      changed = true;
+      this.game.events.emit(GAME_EVENTS.QUEST_COMPLETE, `Neue Aufgabe: ${quest.title}`);
+    }
+    if (changed) {
+      this.emitSideQuests();
+      this.saveCurrentState();
+    }
+  }
+
+  private progressSideQuests(kind: 'gather_herb' | 'kill_dragon'): void {
+    let changed = false;
+    for (const quest of SIDE_QUESTS) {
+      if (quest.kind !== kind) continue;
+      const progress = this.sideQuests[quest.id];
+      if (progress === undefined || progress < 0 || progress >= quest.goal) continue;
+      this.sideQuests[quest.id] = progress + 1;
+      changed = true;
+      if (progress + 1 >= quest.goal) this.completeSideQuest(quest.id);
+    }
+    if (changed) {
+      this.emitSideQuests();
+      this.saveCurrentState();
+    }
+  }
+
+  private completeSideQuest(questId: string): void {
+    const quest = SIDE_QUESTS.find(q => q.id === questId);
+    if (!quest) return;
+    this.sideQuests[questId] = -1;
+    this.gainXp(quest.rewardXp);
+    if (questId === 'elara_herbs') this.addToInventory('potion');
+    if (questId === 'bram_dragons') this.player.addShield();
+    SoundSystem.playLevelUp();
+    this.juice.spawnParticleBurst(this.player.x, this.player.y, 0x4ade80, 14, 70, 500);
+    this.game.events.emit(GAME_EVENTS.QUEST_COMPLETE, `${quest.title} erfüllt! ${quest.rewardLabel}`);
+  }
+
+  private emitSideQuests(): void {
+    const list: SideQuestState[] = SIDE_QUESTS
+      .filter(q => this.sideQuests[q.id] !== undefined)
+      .map(q => ({
+        id: q.id,
+        title: q.title,
+        progress: this.sideQuests[q.id] < 0 ? q.goal : this.sideQuests[q.id],
+        goal: q.goal,
+        done: this.sideQuests[q.id] < 0,
+      }));
+    this.game.events.emit(GAME_EVENTS.SIDE_QUESTS_UPDATE, list);
+  }
+
   // ─── Camera & depth ───────────────────────────────────────────────────────
 
   private setupCamera(): void {
     this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
     this.cameras.main.startFollow(this.player, true, CAMERA_LERP, CAMERA_LERP);
     this.cameras.main.setZoom(1.5);
+    this.atmosphere.applyCameraFX();
   }
 
   private setupDepth(): void {

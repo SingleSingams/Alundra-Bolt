@@ -17,6 +17,8 @@ const FULL_SAVE = {
   questKills: 0,
   questShieldFound: false,
   questBossKilled: false,
+  materials: { wood: 2, herb: 1 } as Partial<Record<import('../constants').MaterialId, number>>,
+  sideQuests: { elara_herbs: 1 } as Record<string, number>,
 };
 
 describe('SaveSystem', () => {

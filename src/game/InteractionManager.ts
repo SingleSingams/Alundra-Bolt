@@ -2,27 +2,34 @@ import * as Phaser from 'phaser';
 import { Player } from './Player';
 import { Item } from './Item';
 import { NPC } from './NPC';
+import { ResourceNode } from './ResourceNode';
 import { JuiceHelper } from './JuiceHelper';
 import { SoundSystem } from './SoundSystem';
 import {
   GAME_EVENTS,
   InventoryItem,
+  MaterialId,
   ZoneId,
   DialogPayload,
   HEART_HEAL_AMOUNT,
   POTION_HEAL_AMOUNT,
   MAX_HP,
   CHEST_INTERACT_RADIUS,
+  RESOURCE_INTERACT_RADIUS,
   SHOP_ITEMS,
+  MATERIALS,
 } from './constants';
 
 const NPC_INTERACT_RADIUS = 42;
 
 export interface InteractionCallbacks {
   addToInventory(item: InventoryItem): void;
+  addMaterial(id: MaterialId, amount: number): void;
   saveCurrentState(): void;
   emitQuestState(): void;
   onShieldQuestFound(): void;
+  onNpcTalked(npcId: string): void;
+  openCrafting(npc: NPC): void;
   getInventory(): InventoryItem[];
   getProjectileDamage(): number;
   setProjectileDamage(v: number): void;
@@ -35,12 +42,14 @@ export interface InteractionCallbacks {
 export class InteractionManager {
   activeChest: Item | null = null;
   activeNpc: NPC | null = null;
+  activeNode: ResourceNode | null = null;
 
   constructor(
     private game: Phaser.Game,
     private player: Player,
     private items: Item[],
     private npcs: NPC[],
+    private resourceNodes: ResourceNode[],
     private juice: JuiceHelper,
     private cb: InteractionCallbacks,
   ) {}
@@ -100,6 +109,16 @@ export class InteractionManager {
       }
     }
 
+    let nearestNode: ResourceNode | null = null;
+    if (!nearestNpc && !nearestChest) {
+      let nearestNodeDist = RESOURCE_INTERACT_RADIUS;
+      for (const node of this.resourceNodes) {
+        if (!node.active || !node.isAvailable()) continue;
+        const d = Phaser.Math.Distance.Between(node.x, node.y, this.player.x, this.player.y);
+        if (d < nearestNodeDist) { nearestNodeDist = d; nearestNode = node; }
+      }
+    }
+
     if (nearestNpc !== this.activeNpc) {
       this.activeNpc?.showInteractPrompt(false);
       this.activeNpc = nearestNpc;
@@ -107,6 +126,10 @@ export class InteractionManager {
     if (nearestChest !== this.activeChest) {
       this.activeChest?.showInteractPrompt(false);
       this.activeChest = nearestChest;
+    }
+    if (nearestNode !== this.activeNode) {
+      this.activeNode?.showInteractPrompt(false);
+      this.activeNode = nearestNode;
     }
 
     if (this.activeNpc) {
@@ -127,6 +150,20 @@ export class InteractionManager {
         }
         this.activeChest = null;
       }
+    } else if (this.activeNode) {
+      this.activeNode.showInteractPrompt(true);
+      this.player.setNearInteractable(true);
+      if (this.player.wantsInteract()) {
+        const node = this.activeNode;
+        if (node.gather()) {
+          SoundSystem.playPickup();
+          this.cb.addMaterial(node.kind, 1);
+          const meta = MATERIALS[node.kind];
+          this.juice.showFloatingText(node.x, node.y - 14, `+1 ${meta.label}`, '#a7f3d0');
+          this.juice.spawnParticleBurst(node.x, node.y, 0x4ade80, 7, 40, 350);
+        }
+        this.activeNode = null;
+      }
     } else {
       this.player.setNearInteractable(false);
     }
@@ -134,6 +171,11 @@ export class InteractionManager {
 
   openDialog(npc: NPC): void {
     this.player.setDialogActive(true);
+    this.cb.onNpcTalked(npc.npcId);
+    if (npc.station) {
+      this.cb.openCrafting(npc);
+      return;
+    }
     if (npc.isShop) {
       this.game.events.emit(GAME_EVENTS.SHOP_OPEN, { npcName: npc.npcName, items: SHOP_ITEMS, xp: this.cb.getXp() });
       return;
@@ -180,5 +222,6 @@ export class InteractionManager {
   reset(): void {
     this.activeChest = null;
     this.activeNpc = null;
+    this.activeNode = null;
   }
 }

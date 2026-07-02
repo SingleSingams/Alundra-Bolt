@@ -7,6 +7,9 @@ import {
   ZONES,
   MinimapData,
   QuestState,
+  MaterialId,
+  MATERIALS,
+  SideQuestState,
 } from '../game/constants';
 import { Map, Backpack } from 'lucide-react';
 
@@ -291,10 +294,12 @@ interface HUDProps {
   bossHp: { hp: number; maxHp: number; phase: number } | null;
   combo?: number;
   quest?: QuestState | null;
+  sideQuests?: SideQuestState[];
+  materials?: Partial<Record<MaterialId, number>>;
   onUsePotion?: () => void;
 }
 
-export function HUD({ hp, maxHp, inventory, zone, xp, level, nextLevelXp, minimapData, showHints, showTouchControls, shieldCharges, bossHp, combo, quest, onUsePotion }: HUDProps) {
+export function HUD({ hp, maxHp, inventory, zone, xp, level, nextLevelXp, minimapData, showHints, showTouchControls, shieldCharges, bossHp, combo, quest, sideQuests, materials, onUsePotion }: HUDProps) {
   const fullHearts = Math.floor(hp / 2);
   const hasHalf = hp % 2 === 1;
   const totalSlots = Math.ceil(maxHp / 2);
@@ -404,6 +409,21 @@ export function HUD({ hp, maxHp, inventory, zone, xp, level, nextLevelXp, minima
                 />
               ))}
             </div>
+            {materials && Object.values(materials).some(v => (v ?? 0) > 0) && (
+              <>
+                <div className="text-[9px] font-bold tracking-widest text-stone-500 uppercase mt-2.5 mb-1.5">Rohstoffe</div>
+                <div className="flex flex-wrap gap-1 max-w-[180px]">
+                  {(Object.keys(MATERIALS) as MaterialId[])
+                    .filter(id => (materials[id] ?? 0) > 0)
+                    .map(id => (
+                      <span key={id} className="inline-flex items-center gap-0.5 rounded bg-stone-800/80 border border-stone-700/50 px-1.5 py-0.5 text-[10px]">
+                        <span>{MATERIALS[id].icon}</span>
+                        <span className="font-mono font-bold text-amber-300">{materials[id]}</span>
+                      </span>
+                    ))}
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -457,7 +477,7 @@ export function HUD({ hp, maxHp, inventory, zone, xp, level, nextLevelXp, minima
       )}
 
       {/* ── Quest badge ── */}
-      {quest && (
+      {(quest || (sideQuests && sideQuests.length > 0)) && (
         <div
           className="absolute pointer-events-none select-none"
           style={{
@@ -465,19 +485,44 @@ export function HUD({ hp, maxHp, inventory, zone, xp, level, nextLevelXp, minima
             left: 'max(0.5rem, env(safe-area-inset-left))',
           }}
         >
-          <div className="bg-stone-900/80 backdrop-blur-sm border border-amber-700/50 rounded-xl px-2.5 py-1.5 shadow-lg max-w-[180px]">
-            <div className="text-[8px] font-bold tracking-widest text-amber-500/80 uppercase mb-1">Aufgabe</div>
-            <div className="text-[11px] text-amber-100 font-medium leading-tight">{quest.label}</div>
-            {quest.goal > 1 && (
-              <div className="mt-1 flex items-center gap-1.5">
-                <div className="flex-1 h-1 rounded-full bg-stone-700/60 overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-amber-500 transition-all duration-500"
-                    style={{ width: `${Math.min((quest.progress / quest.goal) * 100, 100)}%` }}
-                  />
+          <div className="bg-stone-900/80 backdrop-blur-sm border border-amber-700/50 rounded-xl px-2.5 py-1.5 shadow-lg max-w-[190px]">
+            {quest && (
+              <>
+                <div className="text-[8px] font-bold tracking-widest text-amber-500/80 uppercase mb-1">Aufgabe</div>
+                <div className="text-[11px] text-amber-100 font-medium leading-tight">{quest.label}</div>
+                {quest.goal > 1 && (
+                  <div className="mt-1 flex items-center gap-1.5">
+                    <div className="flex-1 h-1 rounded-full bg-stone-700/60 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-amber-500 transition-all duration-500"
+                        style={{ width: `${Math.min((quest.progress / quest.goal) * 100, 100)}%` }}
+                      />
+                    </div>
+                    <span className="text-[9px] font-mono text-stone-400 shrink-0">{quest.progress}/{quest.goal}</span>
+                  </div>
+                )}
+              </>
+            )}
+            {sideQuests && sideQuests.filter(q => !q.done).length > 0 && (
+              <>
+                <div className={cn('text-[8px] font-bold tracking-widest text-emerald-500/80 uppercase mb-1', quest && 'mt-2')}>
+                  Nebenaufgaben
                 </div>
-                <span className="text-[9px] font-mono text-stone-400 shrink-0">{quest.progress}/{quest.goal}</span>
-              </div>
+                {sideQuests.filter(q => !q.done).map(q => (
+                  <div key={q.id} className="mb-1 last:mb-0">
+                    <div className="text-[10px] text-emerald-100 font-medium leading-tight">{q.title}</div>
+                    <div className="mt-0.5 flex items-center gap-1.5">
+                      <div className="flex-1 h-1 rounded-full bg-stone-700/60 overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-emerald-500 transition-all duration-500"
+                          style={{ width: `${Math.min((q.progress / q.goal) * 100, 100)}%` }}
+                        />
+                      </div>
+                      <span className="text-[9px] font-mono text-stone-400 shrink-0">{q.progress}/{q.goal}</span>
+                    </div>
+                  </div>
+                ))}
+              </>
             )}
           </div>
         </div>

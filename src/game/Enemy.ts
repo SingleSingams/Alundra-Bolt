@@ -14,7 +14,7 @@ type EnemyState = 'PATROL' | 'CHASE';
 export type PatrolAxis = 'x' | 'y';
 export type EnemyType = 'basic' | 'ranger' | 'shielder' | 'speedrunner' | 'dragon' | 'dragon-red';
 
-const ENEMY_SPRITE_SCALE = 0.095; // 256px frame → ~24px visual
+const ENEMY_SPRITE_SCALE = 0.145; // 256px frame → ~37px visual
 
 export class Enemy extends Phaser.GameObjects.Container {
   private sprite: Phaser.GameObjects.Sprite | Phaser.GameObjects.Image;
@@ -74,7 +74,7 @@ export class Enemy extends Phaser.GameObjects.Container {
       : (type === 'dragon' || type === 'dragon-red') ? 'enemy'
       : 'enemy';
 
-    this.shadow = scene.add.image(0, 9, 'shadow').setAlpha(0.38).setScale(0.8);
+    this.shadow = scene.add.image(0, 11, 'shadow').setAlpha(0.55).setScale(0.5, 0.32);
 
     if (realSpriteKey && scene.textures.exists(realSpriteKey)) {
       const spriteScale = (type === 'dragon' || type === 'dragon-red') ? ENEMY_SPRITE_SCALE * 1.35 : ENEMY_SPRITE_SCALE;

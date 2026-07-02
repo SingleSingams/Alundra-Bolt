@@ -13,6 +13,9 @@ import {
   LevelUpChoice,
   QuestState,
   ShopItem,
+  MaterialId,
+  CraftStation,
+  SideQuestState,
 } from '../game/constants';
 import { SoundSystem } from '../game/SoundSystem';
 import { SettingsSystem, Settings } from '../game/SettingsSystem';
@@ -27,6 +30,7 @@ import { SkillChoiceScreen } from './SkillChoiceScreen';
 import { MainMenuScreen } from './MainMenuScreen';
 import { VictoryScreen } from './VictoryScreen';
 import { ShopScreen } from './ShopScreen';
+import { CraftingScreen } from './CraftingScreen';
 
 export function GameCanvas() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -52,6 +56,9 @@ export function GameCanvas() {
   const [quest, setQuest] = useState<QuestState | null>(null);
   const [questCompleteNotice, setQuestCompleteNotice] = useState<string | null>(null);
   const [shop, setShop] = useState<{ npcName: string; items: ShopItem[]; xp: number } | null>(null);
+  const [crafting, setCrafting] = useState<{ npcName: string; station: CraftStation; materials: Partial<Record<MaterialId, number>> } | null>(null);
+  const [materials, setMaterials] = useState<Partial<Record<MaterialId, number>>>({});
+  const [sideQuests, setSideQuests] = useState<SideQuestState[]>([]);
   const [settings, setSettings] = useState<Settings>(() => SettingsSystem.load());
   const [loadProgress, setLoadProgress] = useState(0);
   const [loaded, setLoaded] = useState(false);
@@ -154,6 +161,31 @@ export function GameCanvas() {
     gameRef.current?.events.emit(GAME_EVENTS.SHOP_CLOSE);
   }, []);
 
+  const handleCraftOpen = useCallback(
+    (data: { npcName: string; station: CraftStation; materials: Partial<Record<MaterialId, number>> }) => {
+      setCrafting(data);
+    },
+    []
+  );
+
+  const handleCraft = useCallback((recipeId: string) => {
+    setCrafting(prev => {
+      if (prev) gameRef.current?.events.emit(GAME_EVENTS.CRAFT, { recipeId, npcName: prev.npcName });
+      return prev;
+    });
+  }, []);
+
+  const handleCraftClose = useCallback(() => {
+    setCrafting(null);
+    gameRef.current?.events.emit(GAME_EVENTS.CRAFT_CLOSE);
+  }, []);
+
+  const handleMaterialsChange = useCallback(
+    (m: Partial<Record<MaterialId, number>>) => setMaterials(m),
+    []
+  );
+  const handleSideQuestsUpdate = useCallback((list: SideQuestState[]) => setSideQuests(list), []);
+
   const handleNewGame = useCallback((slot: number) => {
     SaveSystem.setSlot(slot);
     SaveSystem.clear();
@@ -171,6 +203,9 @@ export function GameCanvas() {
     const config = createGameConfig(containerRef.current);
     const game = new Phaser.Game(config);
     gameRef.current = game;
+    if (import.meta.env.DEV) {
+      (window as unknown as { __game?: Phaser.Game }).__game = game;
+    }
 
     game.events.on(GAME_EVENTS.HP_CHANGE, handleHpChange);
     game.events.on(GAME_EVENTS.PLAYER_JUMP, handleJump);
@@ -193,6 +228,9 @@ export function GameCanvas() {
     game.events.on(GAME_EVENTS.QUEST_UPDATE, handleQuestUpdate);
     game.events.on(GAME_EVENTS.QUEST_COMPLETE, handleQuestComplete);
     game.events.on(GAME_EVENTS.SHOP_OPEN, handleShopOpen);
+    game.events.on(GAME_EVENTS.CRAFT_OPEN, handleCraftOpen);
+    game.events.on(GAME_EVENTS.MATERIALS_CHANGE, handleMaterialsChange);
+    game.events.on(GAME_EVENTS.SIDE_QUESTS_UPDATE, handleSideQuestsUpdate);
 
     return () => {
       game.events.off(GAME_EVENTS.HP_CHANGE, handleHpChange);
@@ -216,6 +254,9 @@ export function GameCanvas() {
       game.events.off(GAME_EVENTS.QUEST_UPDATE, handleQuestUpdate);
       game.events.off(GAME_EVENTS.QUEST_COMPLETE, handleQuestComplete);
       game.events.off(GAME_EVENTS.SHOP_OPEN, handleShopOpen);
+      game.events.off(GAME_EVENTS.CRAFT_OPEN, handleCraftOpen);
+      game.events.off(GAME_EVENTS.MATERIALS_CHANGE, handleMaterialsChange);
+      game.events.off(GAME_EVENTS.SIDE_QUESTS_UPDATE, handleSideQuestsUpdate);
       game.destroy(true);
       gameRef.current = null;
     };
@@ -240,6 +281,10 @@ export function GameCanvas() {
     handleComboChange,
     handleQuestUpdate,
     handleQuestComplete,
+    handleShopOpen,
+    handleCraftOpen,
+    handleMaterialsChange,
+    handleSideQuestsUpdate,
     gameStarted,
   ]);
 
@@ -278,14 +323,6 @@ export function GameCanvas() {
       {!gameStarted && (
         <MainMenuScreen onNewGame={handleNewGame} onContinue={handleContinue} />
       )}
-      {/* Vignette */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          background:
-            'radial-gradient(ellipse at center, transparent 38%, rgba(0,0,0,0.60) 100%)',
-        }}
-      />
       <HUD
         hp={hp}
         maxHp={MAX_HP}
@@ -302,6 +339,8 @@ export function GameCanvas() {
         bossHp={bossHp}
         combo={combo}
         quest={quest}
+        sideQuests={sideQuests}
+        materials={materials}
         onUsePotion={handleUsePotion}
       />
       {settings.showTouchControls && !dialog && <TouchControls />}
@@ -348,6 +387,14 @@ export function GameCanvas() {
         xp={shop?.xp ?? 0}
         onBuy={handleShopBuy}
         onClose={handleShopClose}
+      />
+      <CraftingScreen
+        isOpen={crafting !== null}
+        npcName={crafting?.npcName ?? ''}
+        station={crafting?.station ?? null}
+        materials={crafting?.materials ?? {}}
+        onCraft={handleCraft}
+        onClose={handleCraftClose}
       />
       {gameStarted && !loaded && <LoadingScreen progress={loadProgress} />}
       {skillChoice && (

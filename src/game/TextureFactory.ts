@@ -79,59 +79,205 @@ export function createSecretWallTexture(scene: Phaser.Scene): void {
   }
 }
 
-const GRASS_PALETTES = [
-  { base: '#4a7c3f', detail: '#3a6432', accent: '#5e9452' },
-  { base: '#527d44', detail: '#406636', accent: '#67a058' },
-  { base: '#3d6e35', detail: '#2e5528', accent: '#52894a' },
-  { base: '#5a8a4d', detail: '#477040', accent: '#6ba05e' },
-  { base: '#446e3a', detail: '#355730', accent: '#58874c' },
-];
+// All 5 variants share one base hue; variation comes from soft blobs and
+// grass blades, NOT from per-tile color jumps — this kills the checkerboard look.
+const GRASS_BASE = { r: 74, g: 118, b: 62 };
 
 function drawGrassTile(
   ctx: CanvasRenderingContext2D,
   offsetX: number,
-  palette: (typeof GRASS_PALETTES)[0],
-  seed: number
+  variant: number,
+  scale: number
 ): void {
-  const size = TILE_SIZE;
-  const rng = (n: number) => Math.abs(Math.sin(seed * 9301 + n * 49297) * 0.5 + 0.5);
+  const size = TILE_SIZE * scale;
+  const rng = (n: number) => Math.abs(Math.sin((variant + 1) * 9301 + n * 49297) * 0.5 + 0.5);
 
-  ctx.fillStyle = palette.base;
+  // Base with a *very* subtle per-variant brightness drift (±1.25%)
+  const drift = (rng(0) - 0.5) * 0.025;
+  const base = `rgb(${Math.round(GRASS_BASE.r * (1 + drift))}, ${Math.round(GRASS_BASE.g * (1 + drift))}, ${Math.round(GRASS_BASE.b * (1 + drift))})`;
+  ctx.fillStyle = base;
   ctx.fillRect(offsetX, 0, size, size);
 
-  ctx.fillStyle = palette.detail;
-  for (let i = 0; i < 8; i++) {
-    const x = Math.floor(rng(i * 2) * (size - 4));
-    const y = Math.floor(rng(i * 2 + 1) * (size - 4));
-    ctx.fillRect(offsetX + x, y, 2, 2);
+  // Soft organic blobs (darker + lighter patches), drawn with radial gradients
+  for (let i = 0; i < 6; i++) {
+    const bx = offsetX + rng(i * 7 + 1) * size;
+    const by = rng(i * 7 + 2) * size;
+    const br = (0.18 + rng(i * 7 + 3) * 0.35) * size;
+    const dark = rng(i * 7 + 4) > 0.5;
+    const g = ctx.createRadialGradient(bx, by, 0, bx, by, br);
+    const c = dark ? '0,20,0' : '90,150,60';
+    g.addColorStop(0, `rgba(${c},${dark ? 0.10 : 0.12})`);
+    g.addColorStop(1, `rgba(${c},0)`);
+    ctx.fillStyle = g;
+    ctx.fillRect(offsetX, 0, size, size);
   }
 
-  ctx.fillStyle = palette.accent;
-  for (let i = 0; i < 4; i++) {
-    const x = Math.floor(rng(i * 3 + 20) * (size - 3));
-    const y = Math.floor(rng(i * 3 + 21) * (size - 3));
-    ctx.fillRect(offsetX + x, y, 1, 3);
-    ctx.fillRect(offsetX + x + 1, y + 1, 1, 2);
+  // Fine grass blades
+  for (let i = 0; i < 26; i++) {
+    const x = offsetX + rng(i * 5 + 40) * size;
+    const y = rng(i * 5 + 41) * size;
+    const h = (1.5 + rng(i * 5 + 42) * 3) * scale;
+    const lean = (rng(i * 5 + 43) - 0.5) * 2 * scale;
+    const light = rng(i * 5 + 44) > 0.6;
+    ctx.strokeStyle = light ? 'rgba(140,190,105,0.5)' : 'rgba(38,72,32,0.45)';
+    ctx.lineWidth = 1 * scale;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.quadraticCurveTo(x + lean * 0.5, y - h * 0.6, x + lean, y - h);
+    ctx.stroke();
   }
 
-  ctx.strokeStyle = 'rgba(0,0,0,0.08)';
-  ctx.lineWidth = 1;
-  ctx.strokeRect(offsetX + 0.5, 0.5, size - 1, size - 1);
+  // Occasional tiny flowers on some variants
+  if (variant === 2 || variant === 4) {
+    for (let i = 0; i < 2; i++) {
+      const x = offsetX + rng(i * 11 + 80) * (size - 4 * scale) + 2 * scale;
+      const y = rng(i * 11 + 81) * (size - 4 * scale) + 2 * scale;
+      ctx.fillStyle = variant === 2 ? 'rgba(250,240,180,0.55)' : 'rgba(235,205,235,0.5)';
+      ctx.beginPath();
+      ctx.arc(x, y, 1.3 * scale, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(250,190,80,0.9)';
+      ctx.beginPath();
+      ctx.arc(x, y, 0.6 * scale, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
 }
 
 export function createGrassTileset(scene: Phaser.Scene): void {
   if (scene.textures.exists('grass-tiles')) return;
 
+  // Render at 2x and let Phaser display it at TILE_SIZE — with linear
+  // filtering this gives noticeably crisper ground detail.
+  const scale = 2;
   const canvas = document.createElement('canvas');
-  canvas.width = TILE_SIZE * TILE_VARIANTS;
-  canvas.height = TILE_SIZE;
+  canvas.width = TILE_SIZE * TILE_VARIANTS * scale;
+  canvas.height = TILE_SIZE * scale;
   const ctx = canvas.getContext('2d')!;
 
-  GRASS_PALETTES.forEach((palette, i) => {
-    drawGrassTile(ctx, i * TILE_SIZE, palette, i + 1);
-  });
+  for (let i = 0; i < TILE_VARIANTS; i++) {
+    drawGrassTile(ctx, i * TILE_SIZE * scale, i, scale);
+  }
 
   scene.textures.addCanvas('grass-tiles', canvas);
+}
+
+/**
+ * A large transparent overlay with big soft light/dark patches. Tiled across
+ * the world at low alpha it breaks up ground repetition — a key ingredient
+ * of the painterly HD-2D ground look.
+ */
+export function createGroundDetailTexture(scene: Phaser.Scene): void {
+  if (scene.textures.exists('ground-detail')) return;
+  const S = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = S;
+  canvas.height = S;
+  const ctx = canvas.getContext('2d')!;
+  const rng = (n: number) => Math.abs(Math.sin(7 * 9301 + n * 49297) * 0.5 + 0.5);
+
+  for (let i = 0; i < 22; i++) {
+    const x = rng(i * 3 + 1) * S;
+    const y = rng(i * 3 + 2) * S;
+    const r = 40 + rng(i * 3 + 3) * 120;
+    const dark = i % 3 !== 0;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    const c = dark ? '10,26,8' : '150,190,110';
+    g.addColorStop(0, `rgba(${c},${dark ? 0.16 : 0.14})`);
+    g.addColorStop(1, `rgba(${c},0)`);
+    ctx.fillStyle = g;
+    // draw wrapped so the tiling has no visible seams
+    for (const ox of [-S, 0, S]) {
+      for (const oy of [-S, 0, S]) {
+        ctx.save();
+        ctx.translate(ox, oy);
+        ctx.fillRect(0, 0, S, S);
+        ctx.restore();
+      }
+    }
+  }
+  scene.textures.addCanvas('ground-detail', canvas);
+}
+
+/** Soft radial light halo for lanterns, campfires and magic glows (additive blend). */
+export function createLightHaloTexture(scene: Phaser.Scene): void {
+  if (scene.textures.exists('light-halo')) return;
+  const S = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = S;
+  canvas.height = S;
+  const ctx = canvas.getContext('2d')!;
+  const g = ctx.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+  g.addColorStop(0, 'rgba(255,255,255,0.9)');
+  g.addColorStop(0.35, 'rgba(255,255,255,0.35)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, S, S);
+  scene.textures.addCanvas('light-halo', canvas);
+}
+
+/** Small soft round particle for ambient effects (pollen, fireflies, embers, dust). */
+export function createSoftParticleTexture(scene: Phaser.Scene): void {
+  if (scene.textures.exists('particle-soft')) return;
+  const S = 16;
+  const canvas = document.createElement('canvas');
+  canvas.width = S;
+  canvas.height = S;
+  const ctx = canvas.getContext('2d')!;
+  const g = ctx.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.5, 'rgba(255,255,255,0.5)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, S, S);
+  scene.textures.addCanvas('particle-soft', canvas);
+}
+
+/** Round dirt "stamp" used to build organic-looking paths by stamping along a line. */
+export function createPathStampTexture(scene: Phaser.Scene): void {
+  if (scene.textures.exists('path-stamp')) return;
+  const S = 64;
+  const canvas = document.createElement('canvas');
+  canvas.width = S;
+  canvas.height = S;
+  const ctx = canvas.getContext('2d')!;
+  const g = ctx.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+  g.addColorStop(0, 'rgba(150,122,86,0.95)');
+  g.addColorStop(0.55, 'rgba(140,113,78,0.85)');
+  g.addColorStop(0.8, 'rgba(120,96,66,0.4)');
+  g.addColorStop(1, 'rgba(110,88,60,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, S, S);
+  // a few pebbles
+  const rng = (n: number) => Math.abs(Math.sin(3 * 9301 + n * 49297) * 0.5 + 0.5);
+  for (let i = 0; i < 5; i++) {
+    const x = 12 + rng(i * 2) * (S - 24);
+    const y = 12 + rng(i * 2 + 1) * (S - 24);
+    ctx.fillStyle = i % 2 ? 'rgba(105,85,60,0.5)' : 'rgba(180,155,115,0.45)';
+    ctx.beginPath();
+    ctx.arc(x, y, 1.5 + rng(i + 9) * 2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  scene.textures.addCanvas('path-stamp', canvas);
+}
+
+/** Ore vein node — a rock with glowing crystals, for the crafting resource nodes. */
+export function createOreNodeTexture(scene: Phaser.Scene): void {
+  if (scene.textures.exists('ore-node')) return;
+  const gfx = scene.add.graphics();
+  const s = 34;
+  gfx.fillStyle(0x57534e, 1); gfx.fillEllipse(s / 2, s / 2 + 3, s - 4, s - 12);
+  gfx.fillStyle(0x78716c, 1); gfx.fillEllipse(s / 2 - 3, s / 2 - 1, s - 12, s - 18);
+  // crystals
+  gfx.fillStyle(0x38bdf8, 1);
+  gfx.fillTriangle(10, 16, 14, 6, 18, 16);
+  gfx.fillTriangle(18, 19, 22, 10, 25, 19);
+  gfx.fillStyle(0x7dd3fc, 1);
+  gfx.fillTriangle(12, 16, 14, 9, 16, 16);
+  gfx.fillStyle(0xbae6fd, 0.8);
+  gfx.fillTriangle(20, 18, 22, 13, 23, 18);
+  gfx.generateTexture('ore-node', s, s);
+  gfx.destroy();
 }
 
 export function createPlayerTexture(scene: Phaser.Scene): void {
@@ -212,11 +358,23 @@ export function createPlayerTexture(scene: Phaser.Scene): void {
 export function createShadowTexture(scene: Phaser.Scene): void {
   if (scene.textures.exists('shadow')) return;
 
-  const gfx = scene.add.graphics();
-  gfx.fillStyle(0x000000, 0.35);
-  gfx.fillEllipse(14, 6, 20, 9);
-  gfx.generateTexture('shadow', 28, 12);
-  gfx.destroy();
+  // Soft radial blob shadow (canvas gradient) instead of a hard-edged ellipse.
+  const W = 56, H = 24;
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d')!;
+  ctx.save();
+  ctx.translate(W / 2, H / 2);
+  ctx.scale(1, H / W);
+  const g = ctx.createRadialGradient(0, 0, 0, 0, 0, W / 2);
+  g.addColorStop(0, 'rgba(0,0,0,0.4)');
+  g.addColorStop(0.6, 'rgba(0,0,0,0.22)');
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(-W / 2, -W / 2, W, W);
+  ctx.restore();
+  scene.textures.addCanvas('shadow', canvas);
 }
 
 export function createHeartTexture(scene: Phaser.Scene): void {

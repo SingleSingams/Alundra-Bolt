@@ -26,6 +26,8 @@ export function VictoryScreen({ isOpen, level, xp, ngPlus }: Props) {
       questKills: 0,
       questShieldFound: false,
       questBossKilled: false,
+      materials: {},
+      sideQuests: {},
     });
     window.location.reload();
   };

@@ -32,6 +32,27 @@ export class JuiceHelper {
     }
   }
 
+  showFloatingText(worldX: number, worldY: number, label: string, color = '#fde68a'): void {
+    const text = this.scene.add.text(worldX, worldY, label, {
+      fontFamily: 'ui-sans-serif, system-ui, sans-serif',
+      fontSize: '12px',
+      color,
+      stroke: '#000000',
+      strokeThickness: 3,
+      resolution: 2,
+    });
+    text.setOrigin(0.5, 1);
+    text.setDepth(9991);
+    this.scene.tweens.add({
+      targets: text,
+      y: worldY - 36,
+      alpha: 0,
+      duration: 800,
+      ease: 'Sine.easeOut',
+      onComplete: () => text.destroy(),
+    });
+  }
+
   showDamageNumber(worldX: number, worldY: number, amount: number, isHeal: boolean): void {
     const label = isHeal ? `+${amount}` : `-${amount}`;
     const text = this.scene.add.text(worldX, worldY, label, {

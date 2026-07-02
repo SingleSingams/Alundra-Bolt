@@ -1,6 +1,7 @@
 import * as Phaser from 'phaser';
+import { CraftStation } from './constants';
 
-const NPC_SCALE = 0.19;
+const NPC_SCALE = 0.24;
 
 export interface NPCDefinition {
   id: string;
@@ -13,6 +14,8 @@ export interface NPCDefinition {
   spriteKey?: string; // e.g. 'npc-woman-adventurer' — overrides default elder sprite
   tint?: number;
   isShop?: boolean;
+  /** If set, interacting opens the crafting screen for this station. */
+  station?: CraftStation;
 }
 
 export class NPC extends Phaser.GameObjects.Container {
@@ -22,6 +25,7 @@ export class NPC extends Phaser.GameObjects.Container {
   public readonly portrait?: string;
   public readonly portraitColumns?: number;
   public readonly isShop: boolean;
+  public readonly station?: CraftStation;
 
   private sprite: Phaser.GameObjects.Sprite;
   private shadow: Phaser.GameObjects.Image;
@@ -38,8 +42,9 @@ export class NPC extends Phaser.GameObjects.Container {
     this.portrait = def.portrait;
     this.portraitColumns = def.portraitColumns;
     this.isShop = def.isShop ?? false;
+    this.station = def.station;
 
-    this.shadow = scene.add.image(0, 14, 'shadow').setAlpha(0.45).setScale(1.4, 0.45);
+    this.shadow = scene.add.image(0, 17, 'shadow').setAlpha(0.6).setScale(0.8, 0.38);
 
     const customKey = def.spriteKey && scene.textures.exists(def.spriteKey) ? def.spriteKey : null;
     const elderKey = scene.textures.exists('npc-elder') ? 'npc-elder' : null;
@@ -64,7 +69,7 @@ export class NPC extends Phaser.GameObjects.Container {
 
     this.promptGfx = scene.add.graphics();
 
-    this.nameTag = scene.add.text(0, -34, def.name, {
+    this.nameTag = scene.add.text(0, -42, def.name, {
       fontFamily: 'ui-sans-serif, system-ui, sans-serif',
       fontSize: '10px',
       color: '#fef3c7',

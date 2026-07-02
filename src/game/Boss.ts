@@ -36,7 +36,7 @@ export class Boss extends Phaser.GameObjects.Container {
 
     this.ensureTextures(scene);
 
-    this.shadow = scene.add.image(0, 16, 'shadow').setAlpha(0.5).setScale(1.5, 1.1);
+    this.shadow = scene.add.image(0, 18, 'shadow').setAlpha(0.65).setScale(0.85, 0.6);
     this.sprite = scene.add.image(0, 0, 'boss');
     this.hpBar = scene.add.graphics();
     this.nameLabel = scene.add.text(0, -43, 'VOID TYRANT', {

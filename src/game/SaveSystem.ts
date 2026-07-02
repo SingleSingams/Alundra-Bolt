@@ -1,4 +1,4 @@
-import { ZoneId, InventoryItem, LevelUpSkill, ZONES } from './constants';
+import { ZoneId, InventoryItem, LevelUpSkill, MaterialId, ZONES } from './constants';
 
 export interface SaveData {
   hp: number;
@@ -14,6 +14,9 @@ export interface SaveData {
   questKills: number;
   questShieldFound: boolean;
   questBossKilled: boolean;
+  materials: Partial<Record<MaterialId, number>>;
+  /** side quest id → progress; -1 = completed & rewarded */
+  sideQuests: Record<string, number>;
 }
 
 export interface SlotPreview {
@@ -43,6 +46,8 @@ const defaults: SaveData = {
   questKills: 0,
   questShieldFound: false,
   questBossKilled: false,
+  materials: {},
+  sideQuests: {},
 };
 
 function parseSlot(slot: number): SaveData | null {
@@ -64,6 +69,8 @@ function parseSlot(slot: number): SaveData | null {
       questKills: p.questKills ?? defaults.questKills,
       questShieldFound: p.questShieldFound ?? defaults.questShieldFound,
       questBossKilled: p.questBossKilled ?? defaults.questBossKilled,
+      materials: p.materials ?? defaults.materials,
+      sideQuests: p.sideQuests ?? defaults.sideQuests,
     };
   } catch {
     return null;

@@ -25,8 +25,11 @@ export function createGameConfig(parent: HTMLElement): Phaser.Types.Core.GameCon
       height: WORLD_HEIGHT,
     },
     render: {
-      pixelArt: true,
-      antialias: false,
+      // The art assets are HD illustrations (256–1024px), not retro pixel art.
+      // Linear filtering + antialiasing keeps them smooth when scaled down.
+      pixelArt: false,
+      antialias: true,
+      roundPixels: false,
     },
   };
 }

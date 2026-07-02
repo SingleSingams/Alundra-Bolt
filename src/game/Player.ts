@@ -41,7 +41,7 @@ const DIRECTION_ANGLES: Record<FacingDirection, number> = {
   s: 90, sw: 135, w: 180, nw: -135,
 };
 
-const KNIGHT_SCALE = 0.19; // 256px frame → ~48px visual
+const KNIGHT_SCALE = 0.26; // 256px frame → ~67px visual (HD art wants size)
 
 export class Player extends Phaser.GameObjects.Container {
   private shadow: Phaser.GameObjects.Image;
@@ -65,6 +65,7 @@ export class Player extends Phaser.GameObjects.Container {
   private shootCooldown = 0;
   private nearChest = false;
   private dialogActive = false;
+  private interactCooldown = 0;
   private frozen = false;
   private shieldCharges = 0;
 
@@ -83,7 +84,7 @@ export class Player extends Phaser.GameObjects.Container {
   constructor(scene: Phaser.Scene, x: number, y: number) {
     super(scene, x, y);
 
-    this.shadow = scene.add.image(0, 14, 'shadow').setAlpha(0.55).setScale(1.6, 0.5);
+    this.shadow = scene.add.image(0, 18, 'shadow').setAlpha(0.7).setScale(0.9, 0.42);
     this.sprite = scene.add.sprite(0, 0, 'knight', 0).setScale(KNIGHT_SCALE);
     this.sprite.play('knight-idle');
     this.directionIndicator = scene.add.graphics();
@@ -136,6 +137,7 @@ export class Player extends Phaser.GameObjects.Container {
   }
 
   update(delta: number): void {
+    if (this.interactCooldown > 0) this.interactCooldown = Math.max(0, this.interactCooldown - delta);
     // Read JustDown once per frame (keyboard + virtual input).
     this.jumpPressedThisFrame =
       Phaser.Input.Keyboard.JustDown(this.keys.jumpZ) ||
@@ -408,8 +410,8 @@ export class Player extends Phaser.GameObjects.Container {
 
     const jumpProgress = Math.abs(this.jumpOffset) / JUMP_HEIGHT;
     // More pronounced shadow — shrinks more and fades more during jump
-    this.shadow.setScale(1 - jumpProgress * 0.6, 1 - jumpProgress * 0.55);
-    this.shadow.setAlpha(0.55 - jumpProgress * 0.45);
+    this.shadow.setScale((1 - jumpProgress * 0.6) * 0.9, (1 - jumpProgress * 0.55) * 0.42);
+    this.shadow.setAlpha(0.7 - jumpProgress * 0.5);
 
     this.directionIndicator.y = this.jumpOffset;
   }
@@ -505,6 +507,11 @@ export class Player extends Phaser.GameObjects.Container {
   }
 
   setDialogActive(value: boolean): void {
+    if (this.dialogActive && !value) {
+      // The key that closed the dialog is still "just pressed" for Phaser this
+      // frame — without a cooldown it would immediately re-open the next dialog.
+      this.interactCooldown = 300;
+    }
     this.dialogActive = value;
     if (value) {
       const body = this.body as Phaser.Physics.Arcade.Body;
@@ -548,7 +555,7 @@ export class Player extends Phaser.GameObjects.Container {
   }
 
   wantsInteract(): boolean {
-    if (this.dialogActive || this.frozen) return false;
+    if (this.dialogActive || this.frozen || this.interactCooldown > 0) return false;
     return this.jumpPressedThisFrame;
   }
 }

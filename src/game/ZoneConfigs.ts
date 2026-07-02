@@ -34,10 +34,22 @@ export const ZONE_CONFIGS: Record<ZoneId, ZoneConfig> = {
         portrait: 'assets/portraits/innkeeper.png',
         x: cx - 155,
         y: cy + 20,
+        station: 'alchemy',
         lines: [
           'Willkommen in Aelindra, Reisender! Ich führe die Apotheke hier drüben.',
-          'Meine Kräuter heilen viele Wunden — aber gegen das Böse im Osten helfen nur Mut und ein gutes Schwert.',
-          'Sprich mit Mira auf dem Dorfplatz. Sie weiß mehr als wir alle zusammen.',
+          'Bring mir Kräuter aus der Wildnis, dann braue ich dir Tränke und Elixiere.',
+        ],
+      },
+      {
+        id: 'torvin',
+        name: 'Schmied Torvin',
+        spriteKey: 'npc-old-explorer',
+        portrait: 'assets/portraits/explorer.png',
+        x: cx - 165,
+        y: cy + 185,
+        station: 'forge',
+        lines: [
+          'Erz und Holz, Ritter — bring mir Erz und Holz, und ich mache dein Schwert schärfer als das Schicksal.',
         ],
       },
       {

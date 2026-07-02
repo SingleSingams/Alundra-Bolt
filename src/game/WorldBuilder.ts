@@ -1,6 +1,7 @@
 import * as Phaser from 'phaser';
 import { ZoneId, TILE_SIZE, MAP_WIDTH, MAP_HEIGHT, WORLD_WIDTH, WORLD_HEIGHT } from './constants';
 import { ZoneConfig, HazardType } from './ZoneConfigs';
+import { AtmosphereSystem } from './AtmosphereSystem';
 
 const centerX = WORLD_WIDTH / 2;
 const centerY = WORLD_HEIGHT / 2;
@@ -33,9 +34,9 @@ function drawTree(
   y: number,
 ): void {
   if (scene.textures.exists('decor-tree')) {
-    const shadow = scene.add.ellipse(x + 4, y + 22, 52, 16, 0x000000, 0.20);
+    const shadow = scene.add.image(x + 4, y + 26, 'shadow').setScale(1.5, 0.95).setAlpha(0.8);
     shadow.setDepth(0.1);
-    const tree = scene.add.image(x, y - 10, 'decor-tree').setScale(0.30);
+    const tree = scene.add.image(x, y - 14, 'decor-tree').setScale(0.38);
     tree.setDepth(y + 0.5);
     treeGroup.add(shadow);
     treeGroup.add(tree);
@@ -76,13 +77,13 @@ export function placeVillage(
   }
 
   const layout: [string, number, number, number, number, number, number][] = [
-    ['building-tavern',     -110, -145, 0.22,  64, 24, 30],
-    ['building-farm',        160, -155, 0.20,  80, 22, 28],
-    ['building-apothecary', -195,   20, 0.21,  72, 22, 26],
-    ['building-market',      155,   30, 0.21,  72, 20, 24],
-    ['building-blacksmith', -200,  165, 0.21,  68, 22, 26],
-    ['building-windmill',      0,  220, 0.22,  52, 22, 30],
-    ['building-watchtower',  205, -215, 0.22,  44, 22, 28],
+    ['building-tavern',     -130, -165, 0.30,  84, 30, 40],
+    ['building-farm',        185, -175, 0.27, 104, 28, 38],
+    ['building-apothecary', -225,   15, 0.28,  94, 28, 34],
+    ['building-market',      180,   30, 0.28,  94, 26, 32],
+    ['building-blacksmith', -230,  185, 0.28,  88, 28, 34],
+    ['building-windmill',      5,  250, 0.30,  68, 28, 40],
+    ['building-watchtower',  235, -245, 0.30,  56, 28, 38],
   ];
 
   for (const [key, ox, oy, scale, bw, bh, bOffY] of layout) {
@@ -92,7 +93,9 @@ export function placeVillage(
     const frame = scene.textures.getFrame(key);
     const vw = frame.realWidth * scale;
     const vh = frame.realHeight * scale;
-    const shadow = scene.add.ellipse(x, y + vh * 0.48, vw * 0.75, 14, 0x000000, 0.22);
+    const shadow = scene.add.image(x + vw * 0.06, y + vh * 0.46, 'shadow')
+      .setDisplaySize(vw * 1.05, vh * 0.4)
+      .setAlpha(0.85);
     shadow.setDepth(y - 1);
     decorGroup.add(shadow);
     const img = scene.add.image(x, y, key).setScale(scale);
@@ -104,11 +107,62 @@ export function placeVillage(
     blocker.refreshBody();
   }
 
-  const pathGfx = scene.add.graphics();
-  pathGfx.fillStyle(0xb8a070, 0.35);
-  pathGfx.fillRoundedRect(centerX - 230, centerY - 20, 460, 38, 8);
-  pathGfx.fillRoundedRect(centerX - 20, centerY - 240, 38, 320, 8);
-  pathGfx.setDepth(0.05);
+  // Organic dirt paths: plaza in the middle, spokes to the buildings
+  const plaza = { x: centerX, y: centerY };
+  drawPath(scene, decorGroup, [{ x: centerX - 250, y: centerY }, plaza, { x: centerX + 250, y: centerY + 10 }], 30);
+  drawPath(scene, decorGroup, [{ x: centerX, y: centerY - 250 }, plaza, { x: centerX + 5, y: centerY + 250 }], 26);
+  drawPath(scene, decorGroup, [plaza, { x: centerX - 195, y: centerY + 170 }], 20);
+  drawPath(scene, decorGroup, [plaza, { x: centerX + 200, y: centerY - 200 }], 20);
+  // plaza center — a wider trampled circle
+  for (let i = 0; i < 7; i++) {
+    const a = (Math.PI * 2 * i) / 7;
+    stampPath(scene, decorGroup, centerX + Math.cos(a) * 18, centerY + Math.sin(a) * 12, 44);
+  }
+}
+
+function stampPath(
+  scene: Phaser.Scene,
+  decorGroup: Phaser.GameObjects.Group,
+  x: number,
+  y: number,
+  size: number,
+): void {
+  if (!scene.textures.exists('path-stamp')) return;
+  const jx = x + (Math.random() - 0.5) * 6;
+  const jy = y + (Math.random() - 0.5) * 6;
+  const img = scene.add.image(jx, jy, 'path-stamp');
+  img.setDisplaySize(size, size * 0.82);
+  img.setAlpha(0.9);
+  img.setDepth(0.05);
+  decorGroup.add(img);
+}
+
+/** Stamps soft dirt circles along a polyline — produces an organic path. */
+export function drawPath(
+  scene: Phaser.Scene,
+  decorGroup: Phaser.GameObjects.Group,
+  points: Array<{ x: number; y: number }>,
+  width: number,
+): void {
+  for (let i = 0; i < points.length - 1; i++) {
+    const a = points[i];
+    const b = points[i + 1];
+    const dist = Phaser.Math.Distance.Between(a.x, a.y, b.x, b.y);
+    const steps = Math.max(2, Math.ceil(dist / (width * 0.35)));
+    for (let s = 0; s <= steps; s++) {
+      const t = s / steps;
+      // slight sinus wobble so paths don't look ruler-straight
+      const wobble = Math.sin(t * Math.PI * 3 + a.x * 0.01) * width * 0.18;
+      const nx = -(b.y - a.y) / (dist || 1);
+      const ny = (b.x - a.x) / (dist || 1);
+      stampPath(
+        scene, decorGroup,
+        Phaser.Math.Linear(a.x, b.x, t) + nx * wobble,
+        Phaser.Math.Linear(a.y, b.y, t) + ny * wobble,
+        width * (0.9 + Math.random() * 0.35),
+      );
+    }
+  }
 }
 
 export function placeDecorations(
@@ -120,26 +174,28 @@ export function placeDecorations(
   type DecorSet = { keys: string[]; scale: number; count: number };
   const byZone: Partial<Record<ZoneId, DecorSet[]>> = {
     grasslands: [
-      { keys: ['decor-bush-yellow', 'decor-bush-berry', 'decor-bush-flower'], scale: 0.28, count: 18 },
-      { keys: ['decor-bush'], scale: 0.26, count: 12 },
-      { keys: ['decor-rock'], scale: 0.22, count: 8 },
+      { keys: ['decor-bush-yellow', 'decor-bush-berry', 'decor-bush-flower'], scale: 0.36, count: 26 },
+      { keys: ['decor-bush'], scale: 0.34, count: 18 },
+      { keys: ['decor-rock'], scale: 0.28, count: 10 },
+      { keys: ['decor-log', 'decor-stump'], scale: 0.32, count: 6 },
     ],
     forest: [
-      { keys: ['decor-log', 'decor-stump'], scale: 0.28, count: 14 },
-      { keys: ['decor-bush', 'decor-bush-berry'], scale: 0.26, count: 16 },
-      { keys: ['decor-rock'], scale: 0.22, count: 6 },
+      { keys: ['decor-log', 'decor-stump'], scale: 0.36, count: 18 },
+      { keys: ['decor-bush', 'decor-bush-berry'], scale: 0.34, count: 24 },
+      { keys: ['decor-bush-flower'], scale: 0.32, count: 8 },
+      { keys: ['decor-rock'], scale: 0.28, count: 8 },
     ],
     dungeon: [
-      { keys: ['decor-rock'], scale: 0.22, count: 10 },
-      { keys: ['decor-dungeon-wall'], scale: 0.30, count: 5 },
+      { keys: ['decor-rock'], scale: 0.28, count: 14 },
+      { keys: ['decor-dungeon-wall'], scale: 0.38, count: 7 },
     ],
     dungeon_interior: [
-      { keys: ['decor-rock'], scale: 0.20, count: 8 },
-      { keys: ['decor-dungeon-wall'], scale: 0.30, count: 6 },
+      { keys: ['decor-rock'], scale: 0.26, count: 10 },
+      { keys: ['decor-dungeon-wall'], scale: 0.38, count: 8 },
     ],
     boss_room: [
-      { keys: ['decor-dungeon-gate'], scale: 0.32, count: 2 },
-      { keys: ['decor-dungeon-wall'], scale: 0.28, count: 4 },
+      { keys: ['decor-dungeon-gate'], scale: 0.40, count: 2 },
+      { keys: ['decor-dungeon-wall'], scale: 0.36, count: 6 },
     ],
   };
   const margin = 3;
@@ -155,6 +211,14 @@ export function placeDecorations(
         if (Math.abs(px - centerX) < 100 && Math.abs(py - centerY) < 100) continue;
         const texKey = keys[Math.floor(Math.random() * keys.length)];
         if (!scene.textures.exists(texKey)) break;
+        const frame = scene.textures.getFrame(texKey);
+        const vw = frame.realWidth * scale;
+        const vh = frame.realHeight * scale;
+        const shadow = scene.add.image(px + vw * 0.05, py + vh * 0.42, 'shadow')
+          .setDisplaySize(vw * 0.95, Math.max(8, vh * 0.3))
+          .setAlpha(0.65);
+        shadow.setDepth(0.1);
+        decorGroup.add(shadow);
         const img = scene.add.image(px, py, texKey).setScale(scale);
         img.setDepth(py + 0.3);
         decorGroup.add(img);
@@ -208,7 +272,9 @@ export function placeCampfire(
   decorGroup: Phaser.GameObjects.Group,
   x: number,
   y: number,
+  atmosphere?: AtmosphereSystem,
 ): void {
+  atmosphere?.addLightHalo(x, y - 2, 85, 0xff9a3c, 0.55);
   const gfx = scene.add.graphics();
   gfx.fillStyle(0x44403c, 0.7);
   gfx.fillCircle(x, y + 6, 8);
