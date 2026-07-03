@@ -4,10 +4,10 @@ import {
   MATERIALS,
   MATERIAL_IDS,
   RESOURCE_NODE_COUNTS,
-  SIDE_QUESTS,
   ESSENCE_DROP_CHANCE,
   MaterialId,
 } from '../constants';
+import { SIDE_QUESTS } from '../StoryScript';
 import { ZONE_CONFIGS } from '../ZoneConfigs';
 
 describe('RECIPES', () => {

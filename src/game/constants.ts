@@ -166,43 +166,7 @@ export const RESOURCE_INTERACT_RADIUS = 40;
 export const ESSENCE_DROP_CHANCE = 0.35;
 
 // ─── Side quests ─────────────────────────────────────────────────────────────
-
-export type SideQuestKind = 'gather_herb' | 'kill_dragon';
-
-export interface SideQuestDef {
-  id: string;
-  /** NPC id that hands out the quest (see ZoneConfigs npcs). */
-  giver: string;
-  title: string;
-  desc: string;
-  goal: number;
-  kind: SideQuestKind;
-  rewardXp: number;
-  rewardLabel: string;
-}
-
-export const SIDE_QUESTS: SideQuestDef[] = [
-  {
-    id: 'elara_herbs',
-    giver: 'elara',
-    title: 'Elaras Vorräte',
-    desc: 'Sammle 3 Kräuter für die Apothekerin.',
-    goal: 3,
-    kind: 'gather_herb',
-    rewardXp: 12,
-    rewardLabel: '+12 XP & Heiltrank',
-  },
-  {
-    id: 'bram_dragons',
-    giver: 'guard',
-    title: 'Brams Sorge',
-    desc: 'Besiege 2 Drachen für den Dorfwächter.',
-    goal: 2,
-    kind: 'kill_dragon',
-    rewardXp: 30,
-    rewardLabel: '+30 XP & Schild-Ladung',
-  },
-];
+// Definitions (with their mini-story dialogs) live in StoryScript.ts.
 
 export interface SideQuestState {
   id: string;

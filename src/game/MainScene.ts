@@ -61,7 +61,6 @@ import {
   RECIPES,
   RESOURCE_NODE_COUNTS,
   ESSENCE_DROP_CHANCE,
-  SIDE_QUESTS,
   SideQuestState,
 } from './constants';
 import { ResourceNode, ResourceKind } from './ResourceNode';
@@ -74,6 +73,8 @@ import {
   BOSS_INTRO,
   ARTHOS_FAREWELL,
   StoryBeat,
+  SIDE_QUESTS,
+  SideQuestKind,
 } from './StoryScript';
 import { SaveSystem } from './SaveSystem';
 import { Boss } from './Boss';
@@ -220,8 +221,13 @@ export class MainScene extends Phaser.Scene {
           }
         },
         getNpcLines: (npcId) => {
+          const quest = this.consumeQuestDialog();
           const stage = getStoryStage(this.questKills, this.questShieldFound, this.questBossKilled);
-          return STORY_NPC_LINES[npcId]?.[stage] ?? null;
+          const story = STORY_NPC_LINES[npcId]?.[stage] ?? null;
+          // One-time quest dialogs (offer/thanks/delivery) outrank the story
+          // override; reminder lines yield to it.
+          if (quest?.important) return quest.lines;
+          return story ?? quest?.lines ?? null;
         },
         getInventory: () => this.inventory,
         getProjectileDamage: () => this.currentProjectileDamage,
@@ -791,6 +797,7 @@ export class MainScene extends Phaser.Scene {
     if (enemyType === 'dragon' || enemyType === 'dragon-red') {
       this.progressSideQuests('kill_dragon');
     }
+    this.progressSideQuests('kill_any');
     this.gainXpWithCombo(XP_BY_ENEMY_TYPE[enemyType ?? ''] ?? XP_PER_ENEMY);
     SoundSystem.playEnemyDeath();
     HapticSystem.death();
@@ -1032,9 +1039,17 @@ export class MainScene extends Phaser.Scene {
 
   // ─── Materials & crafting ─────────────────────────────────────────────────
 
+  private static readonly QUEST_KIND_BY_MATERIAL: Partial<Record<MaterialId, SideQuestKind>> = {
+    herb: 'gather_herb',
+    wood: 'gather_wood',
+    ore: 'gather_ore',
+    essence: 'gather_essence',
+  };
+
   private addMaterial(id: MaterialId, amount: number): void {
     this.materials[id] = (this.materials[id] ?? 0) + amount;
-    if (id === 'herb' && amount > 0) this.progressSideQuests('gather_herb');
+    const questKind = MainScene.QUEST_KIND_BY_MATERIAL[id];
+    if (questKind && amount > 0) this.progressSideQuests(questKind);
     this.emitMaterialsChange();
     this.saveCurrentState();
   }
@@ -1079,27 +1094,67 @@ export class MainScene extends Phaser.Scene {
 
   // ─── Side quests ──────────────────────────────────────────────────────────
 
+  // Side quest state values: undefined = not offered, 0..goal-1 = active,
+  // -1 = completed (reward given, thanks pending), -2 = thanked.
+  // `important` marks one-time dialogs (offer/done/delivery) that outrank
+  // story-stage overrides; reminder lines yield to them.
+  private pendingQuestDialog: { lines: string[]; important: boolean } | null = null;
+
   private onNpcTalked(npcId: string): void {
     // The song accompanies its keepers: Mira's confession and Lina singing.
     const stage = getStoryStage(this.questKills, this.questShieldFound, this.questBossKilled);
     if (stage === 'act3' && (npcId === 'mira' || npcId === 'lina')) {
       SoundSystem.playMirasSong('lullaby');
     }
+
+    this.pendingQuestDialog = null;
     let changed = false;
+
     for (const quest of SIDE_QUESTS) {
+      const progress = this.sideQuests[quest.id];
+
+      // Deliver a message: talking to the target completes a talk_npc quest.
+      if (quest.kind === 'talk_npc' && quest.targetNpc === npcId
+          && progress !== undefined && progress >= 0 && progress < quest.goal) {
+        this.sideQuests[quest.id] = quest.goal;
+        if (quest.targetLines) this.pendingQuestDialog = { lines: quest.targetLines, important: true };
+        this.completeSideQuest(quest.id);
+        changed = true;
+        continue;
+      }
+
       if (quest.giver !== npcId) continue;
-      if (this.sideQuests[quest.id] !== undefined) continue;
-      this.sideQuests[quest.id] = 0;
-      changed = true;
-      this.game.events.emit(GAME_EVENTS.QUEST_COMPLETE, `Neue Aufgabe: ${quest.title}`);
+
+      if (progress === undefined) {
+        // First talk: activate and tell the quest's story.
+        this.sideQuests[quest.id] = 0;
+        this.pendingQuestDialog = { lines: quest.offerLines, important: true };
+        changed = true;
+        this.game.events.emit(GAME_EVENTS.QUEST_COMPLETE, `Neue Aufgabe: ${quest.title}`);
+      } else if (progress >= 0 && progress < quest.goal) {
+        if (quest.activeLines) this.pendingQuestDialog = { lines: quest.activeLines, important: false };
+      } else if (progress === -1) {
+        // Completed but not yet thanked: the payoff dialog, once.
+        this.sideQuests[quest.id] = -2;
+        this.pendingQuestDialog = { lines: quest.doneLines, important: true };
+        changed = true;
+      }
     }
+
     if (changed) {
       this.emitSideQuests();
       this.saveCurrentState();
     }
   }
 
-  private progressSideQuests(kind: 'gather_herb' | 'kill_dragon'): void {
+  /** Quest dialog for the NPC being talked to right now (set by onNpcTalked). */
+  private consumeQuestDialog(): { lines: string[]; important: boolean } | null {
+    const pending = this.pendingQuestDialog;
+    this.pendingQuestDialog = null;
+    return pending;
+  }
+
+  private progressSideQuests(kind: SideQuestKind): void {
     let changed = false;
     for (const quest of SIDE_QUESTS) {
       if (quest.kind !== kind) continue;
@@ -1120,8 +1175,12 @@ export class MainScene extends Phaser.Scene {
     if (!quest) return;
     this.sideQuests[questId] = -1;
     this.gainXp(quest.rewardXp);
-    if (questId === 'elara_herbs') this.addToInventory('potion');
-    if (questId === 'bram_dragons') this.player.addShield();
+    switch (quest.rewardItem) {
+      case 'potion':        this.addToInventory('potion'); break;
+      case 'shield_charge': this.player.addShield(); break;
+      case 'sword_upgrade': this.addToInventory('sword_upgrade'); break;
+      case 'heal_full':     this.player.setHp(MAX_HP); SoundSystem.playHeal(); break;
+    }
     SoundSystem.playLevelUp();
     this.juice.spawnParticleBurst(this.player.x, this.player.y, 0x4ade80, 14, 70, 500);
     this.game.events.emit(GAME_EVENTS.QUEST_COMPLETE, `${quest.title} erfüllt! ${quest.rewardLabel}`);

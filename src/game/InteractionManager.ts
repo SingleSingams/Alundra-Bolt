@@ -174,17 +174,20 @@ export class InteractionManager {
   openDialog(npc: NPC): void {
     this.player.setDialogActive(true);
     this.cb.onNpcTalked(npc.npcId);
-    if (npc.station) {
+    const override = this.cb.getNpcLines(npc.npcId);
+    // Crafters and shopkeepers open their screens — unless they have
+    // something to say right now (quest offer/thanks, story override).
+    if (npc.station && !override) {
       this.cb.openCrafting(npc);
       return;
     }
-    if (npc.isShop) {
+    if (npc.isShop && !override) {
       this.game.events.emit(GAME_EVENTS.SHOP_OPEN, { npcName: npc.npcName, items: SHOP_ITEMS, xp: this.cb.getXp() });
       return;
     }
     const payload: DialogPayload = {
       npcName: npc.npcName,
-      lines: this.cb.getNpcLines(npc.npcId) ?? npc.lines,
+      lines: override ?? npc.lines,
       portrait: npc.portrait,
       portraitColumns: npc.portraitColumns,
     };

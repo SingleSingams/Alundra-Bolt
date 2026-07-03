@@ -185,3 +185,210 @@ export const EPILOGUE_NG_PLUS_HINT = 'Doch tief unter den Trümmern des Verliese
 // ─── Game over flavor ────────────────────────────────────────────────────────
 
 export const GAME_OVER_FLAVOR = 'Auch Arthos fiel, bevor er stand. Steh wieder auf, Ritter.';
+
+// ─── Side quests ─────────────────────────────────────────────────────────────
+// Each side quest is a small self-contained story. Dialog states:
+//   offer  — spoken by the giver when the quest activates (first talk)
+//   active — reminder while in progress (optional; crafters open their
+//            crafting screen instead)
+//   done   — spoken once by the giver after completion (the payoff)
+//   target — for talk_npc quests: what the TARGET says at the delivery moment
+
+export type SideQuestKind =
+  | 'gather_herb'
+  | 'gather_wood'
+  | 'gather_ore'
+  | 'gather_essence'
+  | 'kill_dragon'
+  | 'kill_any'
+  | 'talk_npc';
+
+export type SideQuestRewardItem = 'potion' | 'shield_charge' | 'sword_upgrade' | 'heal_full';
+
+export interface SideQuestDef {
+  id: string;
+  /** NPC id that hands out the quest (see ZoneConfigs npcs). */
+  giver: string;
+  title: string;
+  desc: string;
+  goal: number;
+  kind: SideQuestKind;
+  /** For talk_npc quests: the NPC to deliver the message to. */
+  targetNpc?: string;
+  rewardXp: number;
+  rewardItem?: SideQuestRewardItem;
+  rewardLabel: string;
+  offerLines: string[];
+  activeLines?: string[];
+  doneLines: string[];
+  targetLines?: string[];
+}
+
+export const SIDE_QUESTS: SideQuestDef[] = [
+  {
+    id: 'elara_herbs',
+    giver: 'elara',
+    title: 'Elaras Vorräte',
+    desc: 'Sammle 3 Kräuter für die Apothekerin.',
+    goal: 3,
+    kind: 'gather_herb',
+    rewardXp: 12,
+    rewardItem: 'potion',
+    rewardLabel: '+12 XP & Heiltrank',
+    offerLines: [
+      'Bevor du fragst: Ja, ich braue dir Tränke. Aber meine Regale sind so leer wie Brams Kopf um Mitternacht.',
+      'Die Leere frisst zuerst die Kräuter, weißt du. Als hätte sie Angst vor dem, was heilt.',
+      'Bring mir 3 Kräuter aus der Wildnis — die Beerensträucher, du erkennst sie am Glitzern. Der erste Trank geht dann aufs Haus.',
+    ],
+    doneLines: [
+      'Frisch! Endlich wieder frische Kräuter. Riech mal! ... Na gut, du hast einen Helm auf. Glaub mir einfach.',
+      'Hier, dein Trank — wie versprochen.',
+      'Und sag Magnus, er soll aufhören, meine Medizin „Hexenwasser" zu nennen. Sein Kräuterschnaps ist auch nur Hexenwasser mit schlechterem Ruf.',
+    ],
+  },
+  {
+    id: 'bram_dragons',
+    giver: 'guard',
+    title: 'Brams Sorge',
+    desc: 'Besiege 2 Drachen für den Dorfwächter.',
+    goal: 2,
+    kind: 'kill_dragon',
+    rewardXp: 30,
+    rewardItem: 'shield_charge',
+    rewardLabel: '+30 XP & Schild-Ladung',
+    offerLines: [
+      'Kael, hör zu. Im tiefen Verlies sind DRACHEN. Echte. Ich habe sie gehört. Na gut — Theron hat sie gehört und mir davon erzählt. Aber ich habe SEHR aufmerksam zugehört.',
+      'Die Leute lachen über mich und meine Schatten. Aber wenn ein Drache kommt, lacht keiner mehr.',
+      'Besiege zwei von ihnen, und ich kann nachts wieder atmen. Und vielleicht... hören die Leute auf zu lachen.',
+    ],
+    activeLines: [
+      'Die Drachen, Kael. Tief im Verlies. Ich zähle hier oben derweil die Schatten. Aktueller Stand: 41. Es werden MEHR.',
+    ],
+    doneLines: [
+      'Du hast sie WIRKLICH erlegt? Zwei? DRACHEN?',
+      '(Er richtet sich auf. Zum ersten Mal, seit du ihn kennst, wirkt er nicht nervös.) Weißt du was? Sollen sie doch über meine 37 Schatten lachen. MEIN Ritter erlegt Drachen.',
+      'Hier — meine Ersatz-Schildladung. Ich glaube, du brauchst sie nötiger als ich. Ich habe ja jetzt dich.',
+    ],
+  },
+  {
+    id: 'magnus_table',
+    giver: 'magnus',
+    title: 'Der Stammtisch des Helden',
+    desc: 'Bring Magnus 4 Holz für den wackelnden Stammtisch.',
+    goal: 4,
+    kind: 'gather_wood',
+    rewardXp: 15,
+    rewardItem: 'heal_full',
+    rewardLabel: '+15 XP & Freibier (volle Heilung)',
+    offerLines: [
+      'Kael! Du siehst kräftig aus. Und du gehst sowieso dauernd in den Wald, oder? Mein Stammtisch — das dritte Bein ist hinüber.',
+      'Das ist nicht irgendein Tisch. An dem Tisch saß Arthos, bevor er in den Osten zog. Sein Name ist unten reingeschnitzt. Falsch geschrieben, aber reingeschnitzt.',
+      'Bring mir 4 Holz, und ich zimmere das Bein neu. Der Tisch übersteht mich noch — das schwöre ich dir.',
+    ],
+    activeLines: [
+      'Der Tisch wackelt noch, Kael. Vier Stück Holz. Die alten Stümpfe im Wald geben das beste her.',
+      'Ich habe ein Bierfass druntergestellt. Als Stütze. Es ist eine Tragödie in jeder Hinsicht.',
+    ],
+    doneLines: [
+      'HA! Sieh ihn dir an. Stabil wie ein Fels. Da kann sich eine ganze Abenteurergruppe draufstellen. Bitte nicht draufstellen.',
+      'Weißt du... als ich klein war, sagte mein Großvater immer: „Solange der Tisch steht, kommt er zurück."',
+      '(Er wischt sich etwas aus dem Auge.) Staub. Nur Staub. Dein Bier steht auf dem Tisch, Ritter. Es geht aufs Haus.',
+    ],
+  },
+  {
+    id: 'torvin_horseshoe',
+    giver: 'torvin',
+    title: 'Das Glückseisen',
+    desc: 'Bring Torvin 3 Erz aus dem Verlies.',
+    goal: 3,
+    kind: 'gather_ore',
+    rewardXp: 20,
+    rewardItem: 'sword_upgrade',
+    rewardLabel: '+20 XP & geschärftes Schwert',
+    offerLines: [
+      'Mein Urgroßvater hat Arthos\' Schild geschmiedet. Wusstest du das? DIESE Esse. DIESER Amboss.',
+      'Er gab ihm damals auch ein Glückseisen mit — ein Hufeisen aus Verlies-Erz. „Damit der Junge heimfindet", hat er gesagt. (Pause.) Hat nicht funktioniert.',
+      'Bring mir 3 Erz aus dem Verlies. Ich schmiede ein neues. Diesmal... diesmal findet einer heim.',
+    ],
+    doneLines: [
+      'Es ist fertig. Hörst du, wie es klingt? Wie eine Glocke.',
+      'Mein Urgroßvater hätte geheult vor Freude. Ich heule NICHT. Das ist Funkenflug im Auge. Schmiede haben ständig Funkenflug im Auge.',
+      'Ich habe dir dabei auch gleich die Klinge nachgezogen. Nimm beides mit, Kael. Und finde heim.',
+    ],
+  },
+  {
+    id: 'finn_grove',
+    giver: 'finn',
+    title: 'Gerhard in Gefahr',
+    desc: 'Vertreibe 4 Schattenwesen aus Finns Wald.',
+    goal: 4,
+    kind: 'kill_any',
+    rewardXp: 15,
+    rewardItem: 'potion',
+    rewardLabel: '+15 XP & Waldbeeren-Trank',
+    offerLines: [
+      'Kael! Ein Notfall. Die Schatten-Viecher wetzen ihre Krallen an meinen Bäumen. An GERHARD, Kael.',
+      'Gerhard ist 300 Jahre alt. Er hat den großen Sturm überlebt, zwei Blitzeinschläge und eine sehr aggressive Spechtfamilie. Er wird NICHT als Kratzbaum enden.',
+      'Vertreib 4 von diesen Biestern. Für den Wald. Für Gerhard.',
+    ],
+    activeLines: [
+      'Ich höre sie noch kratzen, Kael. Gerhard verliert Rinde. RINDE, Kael!',
+    ],
+    doneLines: [
+      'Still. Hörst du? Kein Kratzen. Nur Wind und Vögel und Gerhards Blätter.',
+      'Er sieht schon besser aus. Ich glaube, er nickt dir zu. Das macht er sonst nie bei Fremden.',
+      'Du hast einen Freund fürs Leben, Ritter. Er ist ein Baum — aber die besten Freunde reden einem sowieso nicht dazwischen. Hier, ein Trank aus seinen Beeren. Er besteht darauf.',
+    ],
+  },
+  {
+    id: 'soldier_letter',
+    giver: 'soldier',
+    title: 'Worte für Selin',
+    desc: 'Überbringe Selin im Verlies die Nachricht ihres Bruders.',
+    goal: 1,
+    kind: 'talk_npc',
+    targetNpc: 'selin',
+    rewardXp: 25,
+    rewardItem: 'potion',
+    rewardLabel: '+25 XP & Trank',
+    offerLines: [
+      'Warte. Bevor du weitergehst — im Verlies ist eine Frau gefangen. Selin. Sie... sie ist meine Schwester, Kael.',
+      'Ich bin weggerannt und habe sie ZURÜCKGELASSEN. Ich kann ihr nicht unter die Augen treten. Nicht so.',
+      'Aber wenn du sie siehst: Sag ihr, dass ich lebe. Sag ihr, es tut mir leid. Bitte.',
+    ],
+    activeLines: [
+      'Selin. Im Verlies. Bitte, Kael. Jeden Tag, den sie es nicht weiß, ist ein Tag zu viel.',
+    ],
+    doneLines: [
+      'Du hast sie gesehen? Und sie... (Er setzt sich hin. Einfach so, mitten auf den Boden.)',
+      'Nicht böse. Sie ist nicht böse.',
+      'Wenn das hier vorbei ist, hole ich sie da raus. Und dann laufe ich nie wieder weg. Danke, Kael. Hier — meinen Feldtrank. Ich brauche ihn nicht mehr, um zu schlafen.',
+    ],
+    targetLines: [
+      '...er lebt? ER LEBT? (Sie lacht und weint gleichzeitig.) Dieser IDIOT. Dieser wunderbare, feige Idiot.',
+      'Sag ihm: Ich bin nicht böse. Weggerannt ist nur, wer weiß, wohin er gehört.',
+      'Danke, Ritter. Heute Nacht schlafe ich zum ersten Mal seit Wochen.',
+    ],
+  },
+  {
+    id: 'yara_light',
+    giver: 'survivor-mage',
+    title: 'Licht im Dunkel',
+    desc: 'Bring Yara 3 Essenzen für ihren Schutzzauber.',
+    goal: 3,
+    kind: 'gather_essence',
+    rewardXp: 25,
+    rewardItem: 'shield_charge',
+    rewardLabel: '+25 XP & Schild-Ladung',
+    offerLines: [
+      'Mein Schutzzauber flackert. Er braucht Essenz — die Funken, die die Schatten hinterlassen, wenn sie fallen.',
+      'Ironisch, nicht? Das Dunkel liefert das Licht, das uns vor ihm schützt. Fast, als wollte ein Teil von ihm, dass wir bleiben.',
+      'Drei Essenzen, Ritter. Für alle, die hier unten noch atmen.',
+    ],
+    doneLines: [
+      'Sieh nur. Der Zauber — er ist heller. Er hält jetzt. Monate, wenn es sein muss.',
+      'Die Verletzten hier unten... du hast ihnen Zeit gekauft. Zeit ist das Kostbarste, was man einem Menschen geben kann.',
+      'Geh jetzt. Beende es. Und Ritter — das Herz, das ich schlagen hörte? Es schlägt ruhiger, seit du hier bist. Nimm diesen Schildzauber. Er gehörte einem, der ihn nicht mehr braucht.',
+    ],
+  },
+];
