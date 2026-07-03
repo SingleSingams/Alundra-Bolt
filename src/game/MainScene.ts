@@ -276,6 +276,7 @@ export class MainScene extends Phaser.Scene {
           lines: INTRO_LINES,
         };
         this.player.setDialogActive(true);
+        SoundSystem.playMirasSong('lullaby');
         this.game.events.emit(GAME_EVENTS.DIALOG_OPEN, introPayload);
       });
     }
@@ -562,6 +563,7 @@ export class MainScene extends Phaser.Scene {
       this.juice.flashScreen();
     });
     this.game.events.once('boss-phase-3', (data: { x: number; y: number; line: string }) => {
+      SoundSystem.playMirasSong('haunted');
       this.cameras.main.shake(600, 0.025);
       this.juice.spawnParticleBurst(data.x, data.y, 0x3b0764, 28, 110, 700);
       this.juice.spawnParticleBurst(data.x, data.y, 0xa855f7, 18, 80, 550);
@@ -593,6 +595,8 @@ export class MainScene extends Phaser.Scene {
     // Arthos' farewell: the emotional payoff. Victory fires once it's closed.
     this.pendingVictory = { ngPlus: this.ngPlus, level: this.level, xp: this.xp };
     this.time.delayedCall(1600, () => {
+      SoundSystem.stopMusicFade();
+      SoundSystem.playMirasSong('farewell');
       if (!this.showStoryBeat(ARTHOS_FAREWELL) && this.pendingVictory) {
         const data = this.pendingVictory;
         this.pendingVictory = null;
@@ -1076,6 +1080,11 @@ export class MainScene extends Phaser.Scene {
   // ─── Side quests ──────────────────────────────────────────────────────────
 
   private onNpcTalked(npcId: string): void {
+    // The song accompanies its keepers: Mira's confession and Lina singing.
+    const stage = getStoryStage(this.questKills, this.questShieldFound, this.questBossKilled);
+    if (stage === 'act3' && (npcId === 'mira' || npcId === 'lina')) {
+      SoundSystem.playMirasSong('lullaby');
+    }
     let changed = false;
     for (const quest of SIDE_QUESTS) {
       if (quest.giver !== npcId) continue;

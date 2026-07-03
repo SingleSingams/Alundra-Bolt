@@ -2,6 +2,35 @@ type OscType = OscillatorType;
 
 type ZoneTheme = 'grasslands' | 'forest' | 'dungeon' | 'boss';
 
+// ─── Miras Lied ───────────────────────────────────────────────────────────────
+// The song that holds the seal — the story's central motif. A simple lullaby
+// in A minor: rising ("sleep, little brother"), rocking back, opening up, and
+// ending on an unresolved note. The farewell variant resolves to A major
+// (Picardy third) — the release.
+
+export interface SongNote {
+  /** frequency in Hz; 0 = rest */
+  freq: number;
+  /** duration in beats */
+  beats: number;
+}
+
+const A4 = 440, C5 = 523.25, CS5 = 554.37, D5 = 587.33, E5 = 659.25, G5 = 783.99, A5 = 880;
+
+export const MIRAS_SONG: SongNote[] = [
+  { freq: A4, beats: 1 }, { freq: C5, beats: 1 }, { freq: E5, beats: 2 },
+  { freq: D5, beats: 1 }, { freq: C5, beats: 1 }, { freq: A4, beats: 2 },
+  { freq: A4, beats: 1 }, { freq: C5, beats: 1 }, { freq: E5, beats: 1 }, { freq: A5, beats: 3 },
+  { freq: G5, beats: 1 }, { freq: E5, beats: 1 }, { freq: D5, beats: 1 }, { freq: E5, beats: 3 },
+];
+
+/** Farewell ending: replaces the last phrase, resolving to A major. */
+export const MIRAS_SONG_FAREWELL_ENDING: SongNote[] = [
+  { freq: G5, beats: 1 }, { freq: E5, beats: 1 }, { freq: CS5, beats: 1 }, { freq: A4, beats: 4 },
+];
+
+export type SongVariant = 'lullaby' | 'haunted' | 'farewell';
+
 class SoundSystemClass {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
@@ -10,6 +39,8 @@ class SoundSystemClass {
   private musicOscs: OscillatorNode[] = [];
   private musicTimeout: ReturnType<typeof setTimeout> | null = null;
   private currentTheme: ZoneTheme | null = null;
+  private songGain: GainNode | null = null;
+  private songEndsAt = 0;
 
   private percussionGain: GainNode | null = null;
   private percussionInterval: ReturnType<typeof setInterval> | null = null;
@@ -160,6 +191,74 @@ class SoundSystemClass {
     this.currentTheme = null;
     this.stopMusic();
     this.setCombatIntensity(0);
+  }
+
+  // ─── Miras Lied (story motif) ────────────────────────────────────────────
+
+  /**
+   * Plays the song that holds the seal.
+   * - 'lullaby'  — soft and warm (intro, Mira's confession, Lina)
+   * - 'haunted'  — detuned and urgent, cuts through the boss theme (phase 3)
+   * - 'farewell' — slow and clear, resolving to A major (Arthos' release)
+   */
+  playMirasSong(variant: SongVariant): void {
+    const ctx = this.ensure();
+    if (!ctx) return;
+    if (ctx.currentTime < this.songEndsAt) return; // don't overlap with itself
+
+    if (!this.songGain) {
+      this.songGain = ctx.createGain();
+      this.songGain.connect(ctx.destination);
+    }
+    const level =
+      variant === 'haunted' ? 0.085 :
+      variant === 'farewell' ? 0.10 : 0.075;
+    this.songGain.gain.setValueAtTime(level * this.volumeMultiplier, ctx.currentTime);
+
+    const beatSec = variant === 'farewell' ? 0.62 : variant === 'haunted' ? 0.42 : 0.52;
+    const notes: SongNote[] = variant === 'farewell'
+      ? [...MIRAS_SONG.slice(0, MIRAS_SONG.length - 4), ...MIRAS_SONG_FAREWELL_ENDING]
+      : MIRAS_SONG;
+
+    let t = ctx.currentTime + 0.05;
+    for (const note of notes) {
+      const dur = note.beats * beatSec;
+      if (note.freq > 0) {
+        this.songVoice(note.freq, t, dur, variant);
+        if (variant !== 'haunted') {
+          // soft lower octave doubling — the "humming" quality
+          this.songVoice(note.freq / 2, t, dur, variant, 0.35);
+        } else {
+          // beating detuned second voice — something is wrong with the song
+          this.songVoice(note.freq * 1.013, t, dur, variant, 0.7);
+        }
+      }
+      t += dur;
+    }
+
+    if (variant === 'farewell') {
+      // final A-major chord, very soft — the seal releases
+      const chord = [220, 554.37, 659.25];
+      for (const freq of chord) this.songVoice(freq, t, 3.2, variant, 0.5);
+      t += 3.2;
+    }
+    this.songEndsAt = t;
+  }
+
+  private songVoice(freq: number, start: number, dur: number, variant: SongVariant, gainScale = 1): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.songGain) return;
+    const osc = ctx.createOscillator();
+    const env = ctx.createGain();
+    osc.type = variant === 'haunted' ? 'triangle' : 'sine';
+    osc.frequency.value = freq;
+    env.gain.setValueAtTime(0.001, start);
+    env.gain.linearRampToValueAtTime(0.6 * gainScale, start + Math.min(0.08, dur * 0.2));
+    env.gain.setTargetAtTime(0.001, start + dur * 0.75, dur * 0.12);
+    osc.connect(env);
+    env.connect(this.songGain);
+    osc.start(start);
+    osc.stop(start + dur + 0.1);
   }
 
   setCombatIntensity(level: 0 | 1 | 2): void {
