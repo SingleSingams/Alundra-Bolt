@@ -1,4 +1,5 @@
 import * as Phaser from 'phaser';
+import { LoadingScene } from './LoadingScene';
 import { MainScene } from './MainScene';
 import { WORLD_WIDTH, WORLD_HEIGHT } from './constants';
 
@@ -16,7 +17,7 @@ export function createGameConfig(parent: HTMLElement): Phaser.Types.Core.GameCon
         debug: false,
       },
     },
-    scene: [MainScene],
+    scene: [LoadingScene, MainScene],
     scale: {
       mode: Phaser.Scale.RESIZE,
       autoCenter: Phaser.Scale.CENTER_BOTH,
@@ -24,8 +25,11 @@ export function createGameConfig(parent: HTMLElement): Phaser.Types.Core.GameCon
       height: WORLD_HEIGHT,
     },
     render: {
-      pixelArt: true,
-      antialias: false,
+      // The art assets are HD illustrations (256–1024px), not retro pixel art.
+      // Linear filtering + antialiasing keeps them smooth when scaled down.
+      pixelArt: false,
+      antialias: true,
+      roundPixels: false,
     },
   };
 }

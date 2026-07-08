@@ -1,46 +1,416 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import * as Phaser from 'phaser';
 import { createGameConfig } from '../game/GameConfig';
-import { GAME_EVENTS, MAX_HP } from '../game/constants';
+import {
+  GAME_EVENTS,
+  MAX_HP,
+  InventoryItem,
+  ZoneId,
+  DialogPayload,
+  XP_THRESHOLDS,
+  MinimapData,
+  LevelUpSkill,
+  LevelUpChoice,
+  QuestState,
+  ShopItem,
+  MaterialId,
+  CraftStation,
+  SideQuestState,
+} from '../game/constants';
+import { SoundSystem } from '../game/SoundSystem';
+import { SettingsSystem, Settings } from '../game/SettingsSystem';
+import { SaveSystem } from '../game/SaveSystem';
 import { HUD } from './HUD';
+import { DialogBox } from './DialogBox';
+import { GameOverScreen } from './GameOverScreen';
+import { PauseMenu } from './PauseMenu';
+import { TouchControls } from './TouchControls';
+import { LoadingScreen } from './LoadingScreen';
+import { SkillChoiceScreen } from './SkillChoiceScreen';
+import { MainMenuScreen } from './MainMenuScreen';
+import { VictoryScreen } from './VictoryScreen';
+import { ShopScreen } from './ShopScreen';
+import { CraftingScreen } from './CraftingScreen';
 
 export function GameCanvas() {
   const containerRef = useRef<HTMLDivElement>(null);
   const gameRef = useRef<Phaser.Game | null>(null);
   const [hp, setHp] = useState(MAX_HP);
   const [isJumping, setIsJumping] = useState(false);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [zone, setZone] = useState<ZoneId>('grasslands');
+  const [dialog, setDialog] = useState<DialogPayload | null>(null);
+  const [saveNotice, setSaveNotice] = useState(false);
+  const [gameOver, setGameOver] = useState(false);
+  const [xp, setXp] = useState(0);
+  const [level, setLevel] = useState(1);
+  const [nextLevelXp, setNextLevelXp] = useState<number | null>(XP_THRESHOLDS[0]);
+  const [levelUpNotice, setLevelUpNotice] = useState<number | null>(null);
+  const [minimapData, setMinimapData] = useState<MinimapData | null>(null);
+  const [shieldCharges, setShieldCharges] = useState(0);
+  const [bossHp, setBossHp] = useState<{ hp: number; maxHp: number; phase: number } | null>(null);
+  const [skillChoice, setSkillChoice] = useState<{ level: number; skills: LevelUpSkill[]; chosen: LevelUpSkill[] } | null>(null);
+  const [paused, setPaused] = useState(false);
+  const [victory, setVictory] = useState<{ ngPlus: number } | null>(null);
+  const [combo, setCombo] = useState(0);
+  const [quest, setQuest] = useState<QuestState | null>(null);
+  const [questCompleteNotice, setQuestCompleteNotice] = useState<string | null>(null);
+  const [shop, setShop] = useState<{ npcName: string; items: ShopItem[]; xp: number } | null>(null);
+  const [crafting, setCrafting] = useState<{ npcName: string; station: CraftStation; materials: Partial<Record<MaterialId, number>> } | null>(null);
+  const [materials, setMaterials] = useState<Partial<Record<MaterialId, number>>>({});
+  const [sideQuests, setSideQuests] = useState<SideQuestState[]>([]);
+  const [settings, setSettings] = useState<Settings>(() => SettingsSystem.load());
+  const [loadProgress, setLoadProgress] = useState(0);
+  const [loaded, setLoaded] = useState(false);
+  const [gameStarted, setGameStarted] = useState(false);
 
-  const handleHpChange = useCallback((newHp: number) => {
-    setHp(newHp);
+  const handleSettingsChange = useCallback((s: Settings) => {
+    setSettings(s);
+    SettingsSystem.save(s);
+    SoundSystem.setVolume(s.volume);
   }, []);
 
+  // Apply initial volume on mount
+  useEffect(() => {
+    SoundSystem.setVolume(settings.volume);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleHpChange = useCallback((newHp: number) => setHp(newHp), []);
   const handleJump = useCallback(() => setIsJumping(true), []);
   const handleLand = useCallback(() => setIsJumping(false), []);
+  const handleInventoryChange = useCallback(
+    (items: InventoryItem[]) => setInventory(items),
+    []
+  );
+  const handleZoneChange = useCallback((z: ZoneId) => setZone(z), []);
+  const handleDialogOpen = useCallback(
+    (payload: DialogPayload) => setDialog(payload),
+    []
+  );
+  const handleSaveLoaded = useCallback(() => {
+    setSaveNotice(true);
+    setTimeout(() => setSaveNotice(false), 2500);
+  }, []);
+  const handleGameOver = useCallback(() => setGameOver(true), []);
+  const handleVictory = useCallback((data: { ngPlus: number }) => setVictory(data), []);
+  const handleComboChange = useCallback((c: number) => setCombo(c), []);
+  const handleQuestUpdate = useCallback((q: QuestState | null) => setQuest(q), []);
+  const handleQuestComplete = useCallback((label: string) => {
+    setQuestCompleteNotice(label);
+    setTimeout(() => setQuestCompleteNotice(null), 2800);
+  }, []);
+  const handleXpChange = useCallback(
+    (data: { xp: number; level: number; nextLevelXp: number | null }) => {
+      setXp(data.xp);
+      setLevel(data.level);
+      setNextLevelXp(data.nextLevelXp);
+    },
+    []
+  );
+  const handleLevelUp = useCallback((newLevel: number) => {
+    setLevelUpNotice(newLevel);
+    setTimeout(() => setLevelUpNotice(null), 2200);
+  }, []);
+  const handleLevelUpChoice = useCallback((data: LevelUpChoice) => {
+    setSkillChoice({ level: level, skills: data.skills, chosen: data.chosen ?? [] });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [level]);
+  const handleMinimapUpdate = useCallback((data: MinimapData) => setMinimapData(data), []);
+  const handleLoadProgress = useCallback((v: number) => setLoadProgress(v), []);
+  const handleLoadComplete = useCallback(() => setLoaded(true), []);
+
+  // Safety: dismiss loading screen after 5 s even if LOADING_COMPLETE never fires
+  useEffect(() => {
+    if (!gameStarted || loaded) return;
+    const id = setTimeout(() => setLoaded(true), 5000);
+    return () => clearTimeout(id);
+  }, [gameStarted, loaded]);
+
+  const handleShieldChange = useCallback((charges: number) => setShieldCharges(charges), []);
+  const handleBossHp = useCallback(
+    (data: { hp: number; maxHp: number; phase: number }) =>
+      setBossHp(data.maxHp > 0 ? data : null),
+    []
+  );
+
+  const handleUsePotion = useCallback(() => {
+    gameRef.current?.events.emit(GAME_EVENTS.USE_POTION);
+  }, []);
+
+  const handleSkillChosen = useCallback((skill: LevelUpSkill) => {
+    setSkillChoice(null);
+    gameRef.current?.events.emit(GAME_EVENTS.LEVEL_UP_CHOSEN, skill);
+  }, []);
+
+  const closeDialog = useCallback(() => {
+    setDialog(null);
+    gameRef.current?.events.emit(GAME_EVENTS.DIALOG_CLOSE);
+  }, []);
+
+  const handleShopOpen = useCallback((data: { npcName: string; items: ShopItem[]; xp: number }) => {
+    setShop(data);
+  }, []);
+
+  const handleShopBuy = useCallback((itemId: string) => {
+    gameRef.current?.events.emit(GAME_EVENTS.SHOP_BUY, itemId);
+  }, []);
+
+  const handleShopClose = useCallback(() => {
+    setShop(null);
+    gameRef.current?.events.emit(GAME_EVENTS.SHOP_CLOSE);
+  }, []);
+
+  const handleCraftOpen = useCallback(
+    (data: { npcName: string; station: CraftStation; materials: Partial<Record<MaterialId, number>> }) => {
+      setCrafting(data);
+    },
+    []
+  );
+
+  const handleCraft = useCallback((recipeId: string) => {
+    setCrafting(prev => {
+      if (prev) gameRef.current?.events.emit(GAME_EVENTS.CRAFT, { recipeId, npcName: prev.npcName });
+      return prev;
+    });
+  }, []);
+
+  const handleCraftClose = useCallback(() => {
+    setCrafting(null);
+    gameRef.current?.events.emit(GAME_EVENTS.CRAFT_CLOSE);
+  }, []);
+
+  const handleMaterialsChange = useCallback(
+    (m: Partial<Record<MaterialId, number>>) => setMaterials(m),
+    []
+  );
+  const handleSideQuestsUpdate = useCallback((list: SideQuestState[]) => setSideQuests(list), []);
+
+  const handleNewGame = useCallback((slot: number) => {
+    SaveSystem.setSlot(slot);
+    SaveSystem.clear();
+    setGameStarted(true);
+  }, []);
+
+  const handleContinue = useCallback((slot: number) => {
+    SaveSystem.setSlot(slot);
+    setGameStarted(true);
+  }, []);
 
   useEffect(() => {
-    if (!containerRef.current || gameRef.current) return;
+    if (!gameStarted || !containerRef.current || gameRef.current) return;
 
     const config = createGameConfig(containerRef.current);
     const game = new Phaser.Game(config);
     gameRef.current = game;
+    if (import.meta.env.DEV) {
+      (window as unknown as { __game?: Phaser.Game }).__game = game;
+    }
 
     game.events.on(GAME_EVENTS.HP_CHANGE, handleHpChange);
     game.events.on(GAME_EVENTS.PLAYER_JUMP, handleJump);
     game.events.on(GAME_EVENTS.PLAYER_LAND, handleLand);
+    game.events.on(GAME_EVENTS.INVENTORY_CHANGE, handleInventoryChange);
+    game.events.on(GAME_EVENTS.ZONE_CHANGE, handleZoneChange);
+    game.events.on(GAME_EVENTS.DIALOG_OPEN, handleDialogOpen);
+    game.events.on(GAME_EVENTS.SAVE_LOADED, handleSaveLoaded);
+    game.events.on(GAME_EVENTS.GAME_OVER, handleGameOver);
+    game.events.on(GAME_EVENTS.XP_CHANGE, handleXpChange);
+    game.events.on(GAME_EVENTS.LEVEL_UP, handleLevelUp);
+    game.events.on(GAME_EVENTS.MINIMAP_UPDATE, handleMinimapUpdate);
+    game.events.on(GAME_EVENTS.LOADING_PROGRESS, handleLoadProgress);
+    game.events.on(GAME_EVENTS.LOADING_COMPLETE, handleLoadComplete);
+    game.events.on(GAME_EVENTS.SHIELD_CHANGE, handleShieldChange);
+    game.events.on(GAME_EVENTS.BOSS_HP, handleBossHp);
+    game.events.on(GAME_EVENTS.LEVEL_UP_CHOICE, handleLevelUpChoice);
+    game.events.on(GAME_EVENTS.VICTORY, handleVictory);
+    game.events.on(GAME_EVENTS.COMBO_CHANGE, handleComboChange);
+    game.events.on(GAME_EVENTS.QUEST_UPDATE, handleQuestUpdate);
+    game.events.on(GAME_EVENTS.QUEST_COMPLETE, handleQuestComplete);
+    game.events.on(GAME_EVENTS.SHOP_OPEN, handleShopOpen);
+    game.events.on(GAME_EVENTS.CRAFT_OPEN, handleCraftOpen);
+    game.events.on(GAME_EVENTS.MATERIALS_CHANGE, handleMaterialsChange);
+    game.events.on(GAME_EVENTS.SIDE_QUESTS_UPDATE, handleSideQuestsUpdate);
 
     return () => {
       game.events.off(GAME_EVENTS.HP_CHANGE, handleHpChange);
       game.events.off(GAME_EVENTS.PLAYER_JUMP, handleJump);
       game.events.off(GAME_EVENTS.PLAYER_LAND, handleLand);
+      game.events.off(GAME_EVENTS.INVENTORY_CHANGE, handleInventoryChange);
+      game.events.off(GAME_EVENTS.ZONE_CHANGE, handleZoneChange);
+      game.events.off(GAME_EVENTS.DIALOG_OPEN, handleDialogOpen);
+      game.events.off(GAME_EVENTS.SAVE_LOADED, handleSaveLoaded);
+      game.events.off(GAME_EVENTS.GAME_OVER, handleGameOver);
+      game.events.off(GAME_EVENTS.XP_CHANGE, handleXpChange);
+      game.events.off(GAME_EVENTS.LEVEL_UP, handleLevelUp);
+      game.events.off(GAME_EVENTS.MINIMAP_UPDATE, handleMinimapUpdate);
+      game.events.off(GAME_EVENTS.LOADING_PROGRESS, handleLoadProgress);
+      game.events.off(GAME_EVENTS.LOADING_COMPLETE, handleLoadComplete);
+      game.events.off(GAME_EVENTS.SHIELD_CHANGE, handleShieldChange);
+      game.events.off(GAME_EVENTS.BOSS_HP, handleBossHp);
+      game.events.off(GAME_EVENTS.LEVEL_UP_CHOICE, handleLevelUpChoice);
+      game.events.off(GAME_EVENTS.VICTORY, handleVictory);
+      game.events.off(GAME_EVENTS.COMBO_CHANGE, handleComboChange);
+      game.events.off(GAME_EVENTS.QUEST_UPDATE, handleQuestUpdate);
+      game.events.off(GAME_EVENTS.QUEST_COMPLETE, handleQuestComplete);
+      game.events.off(GAME_EVENTS.SHOP_OPEN, handleShopOpen);
+      game.events.off(GAME_EVENTS.CRAFT_OPEN, handleCraftOpen);
+      game.events.off(GAME_EVENTS.MATERIALS_CHANGE, handleMaterialsChange);
+      game.events.off(GAME_EVENTS.SIDE_QUESTS_UPDATE, handleSideQuestsUpdate);
       game.destroy(true);
       gameRef.current = null;
     };
-  }, [handleHpChange, handleJump, handleLand]);
+  }, [
+    handleHpChange,
+    handleJump,
+    handleLand,
+    handleInventoryChange,
+    handleZoneChange,
+    handleDialogOpen,
+    handleSaveLoaded,
+    handleGameOver,
+    handleXpChange,
+    handleLevelUp,
+    handleMinimapUpdate,
+    handleLoadProgress,
+    handleLoadComplete,
+    handleShieldChange,
+    handleBossHp,
+    handleLevelUpChoice,
+    handleVictory,
+    handleComboChange,
+    handleQuestUpdate,
+    handleQuestComplete,
+    handleShopOpen,
+    handleCraftOpen,
+    handleMaterialsChange,
+    handleSideQuestsUpdate,
+    gameStarted,
+  ]);
+
+  // ESC / P key → pause toggle; F key → fullscreen (skip during game over)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.key === 'Escape' || e.key === 'p' || e.key === 'P') && !gameOver) {
+        setPaused(p => !p);
+      }
+      if (e.key === 'f' || e.key === 'F') {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen().catch(() => {});
+        } else {
+          document.exitFullscreen().catch(() => {});
+        }
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [gameOver]);
+
+  // Sync pause state to Phaser scene
+  useEffect(() => {
+    const game = gameRef.current;
+    if (!game) return;
+    if (paused) {
+      game.scene.pause('MainScene');
+    } else {
+      game.scene.resume('MainScene');
+    }
+  }, [paused]);
 
   return (
     <div className="relative w-full h-full">
       <div ref={containerRef} className="w-full h-full" />
-      <HUD hp={hp} maxHp={MAX_HP} isJumping={isJumping} />
+      {!gameStarted && (
+        <MainMenuScreen onNewGame={handleNewGame} onContinue={handleContinue} />
+      )}
+      <HUD
+        hp={hp}
+        maxHp={MAX_HP}
+        isJumping={isJumping}
+        inventory={inventory}
+        zone={zone}
+        xp={xp}
+        level={level}
+        nextLevelXp={nextLevelXp}
+        minimapData={minimapData}
+        showHints={settings.showHints && !settings.showTouchControls}
+        showTouchControls={settings.showTouchControls}
+        shieldCharges={shieldCharges}
+        bossHp={bossHp}
+        combo={combo}
+        quest={quest}
+        sideQuests={sideQuests}
+        materials={materials}
+        onUsePotion={handleUsePotion}
+      />
+      {settings.showTouchControls && !dialog && <TouchControls />}
+      {levelUpNotice !== null && (
+        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-50 text-center animate-in fade-in zoom-in duration-300">
+          <div className="bg-amber-900/80 border-2 border-amber-400/80 text-amber-200 font-bold
+            px-6 py-3 rounded-xl shadow-2xl shadow-amber-900/50">
+            <div className="text-xs tracking-widest uppercase text-amber-400 mb-1">Aufgestiegen!</div>
+            <div className="text-2xl font-extrabold text-amber-100">Level {levelUpNotice}</div>
+            <div className="text-xs text-amber-300 mt-1">HP vollständig wiederhergestellt</div>
+          </div>
+        </div>
+      )}
+      {saveNotice && (
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-50
+          bg-stone-900/80 border border-amber-600/60 text-amber-300 text-xs font-mono
+          px-4 py-2 rounded shadow-lg animate-fade-in">
+          Spielstand geladen
+        </div>
+      )}
+      {questCompleteNotice && (
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-50 text-center">
+          <div className="bg-emerald-900/85 border-2 border-emerald-400/80 text-emerald-100 font-bold
+            px-5 py-2 rounded-xl shadow-2xl shadow-emerald-900/50">
+            <div className="text-xs tracking-widest uppercase text-emerald-400 mb-0.5">Aufgabe erfüllt!</div>
+            <div className="text-sm font-semibold">{questCompleteNotice}</div>
+          </div>
+        </div>
+      )}
+      <DialogBox
+        isOpen={dialog !== null}
+        npcName={dialog?.npcName ?? ''}
+        lines={dialog?.lines ?? []}
+        portrait={dialog?.portrait}
+        portraitColumns={dialog?.portraitColumns}
+        onClose={closeDialog}
+      />
+      <GameOverScreen isOpen={gameOver} level={level} xp={xp} zone={zone} />
+      <VictoryScreen isOpen={victory !== null} level={level} xp={xp} ngPlus={victory?.ngPlus ?? 0} />
+      <ShopScreen
+        isOpen={shop !== null}
+        npcName={shop?.npcName ?? ''}
+        items={shop?.items ?? []}
+        xp={shop?.xp ?? 0}
+        onBuy={handleShopBuy}
+        onClose={handleShopClose}
+      />
+      <CraftingScreen
+        isOpen={crafting !== null}
+        npcName={crafting?.npcName ?? ''}
+        station={crafting?.station ?? null}
+        materials={crafting?.materials ?? {}}
+        onCraft={handleCraft}
+        onClose={handleCraftClose}
+      />
+      {gameStarted && !loaded && <LoadingScreen progress={loadProgress} />}
+      {skillChoice && (
+        <SkillChoiceScreen
+          level={skillChoice.level}
+          skills={skillChoice.skills}
+          chosen={skillChoice.chosen}
+          onChoose={handleSkillChosen}
+        />
+      )}
+      <PauseMenu
+        isOpen={paused && !gameOver}
+        onResume={() => setPaused(false)}
+        settings={settings}
+        onSettingsChange={handleSettingsChange}
+      />
     </div>
   );
 }
