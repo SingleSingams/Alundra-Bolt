@@ -75,6 +75,13 @@ export class Player extends Phaser.GameObjects.Container {
   private dashTimer = 0;
   private dashPressedThisFrame = false;
 
+  // Procedural movement feel (the sheet's walk/attack frames are off-centre,
+  // so all motion is sold via transforms on the stable frame 0).
+  private walkCycle = 0;
+  private stepDustTimer = 0;
+  private attackLungeX = 0;
+  private attackLungeY = 0;
+
   // Cached per-frame key states — JustDown consumes the flag on first call,
   // so we read it exactly once per key per frame and share the result.
   private jumpPressedThisFrame = false;
@@ -272,18 +279,28 @@ export class Player extends Phaser.GameObjects.Container {
     body.enable = true;
     this.updateAttackZonePosition();
     this.drawSlashEffect();
-    this.spawnGhostTrail();
 
+    // No frame animation and no ghost trail here: the sheet's attack frames
+    // sit off-centre, which made the knight appear to double for a moment.
+    // Instead: a punchy lunge towards the strike plus a squash.
+    const angle = Phaser.Math.DegToRad(DIRECTION_ANGLES[this.lastDirection]);
     this.scene.tweens.killTweensOf(this.sprite);
-    this.sprite.play('knight-attack');
-    this.sprite.once('animationcomplete', () => {
-      if (!this.isAttacking) return;
-      this.sprite.play('knight-idle');
+    this.scene.tweens.killTweensOf(this);
+    this.attackLungeX = 0;
+    this.attackLungeY = 0;
+    this.scene.tweens.add({
+      targets: this,
+      attackLungeX: Math.cos(angle) * 9,
+      attackLungeY: Math.sin(angle) * 9,
+      duration: ATTACK_DURATION * 0.4,
+      yoyo: true,
+      ease: 'Sine.easeOut',
+      onComplete: () => { this.attackLungeX = 0; this.attackLungeY = 0; },
     });
     this.scene.tweens.add({
       targets: this.sprite,
-      scaleX: KNIGHT_SCALE * 1.4,
-      scaleY: KNIGHT_SCALE * 0.88,
+      scaleX: KNIGHT_SCALE * 1.12,
+      scaleY: KNIGHT_SCALE * 0.92,
       duration: 80,
       yoyo: true,
       ease: 'Sine.easeOut',
@@ -293,32 +310,15 @@ export class Player extends Phaser.GameObjects.Container {
     this.scene.game.events.emit(GAME_EVENTS.PLAYER_ATTACK, this.lastDirection);
   }
 
-  private spawnGhostTrail(): void {
-    for (let i = 0; i < 3; i++) {
-      this.scene.time.delayedCall(i * 18, () => {
-        if (!this.active) return;
-        const ghost = this.scene.add.sprite(this.x, this.y + this.jumpOffset, 'knight', this.sprite.frame.name as unknown as number);
-        ghost.setScale(KNIGHT_SCALE);
-        ghost.setFlipX(this.sprite.flipX);
-        ghost.setAlpha(0.45 - i * 0.12);
-        ghost.setTint(0x93c5fd);
-        ghost.setDepth(this.depth - 0.1);
-        this.scene.tweens.add({
-          targets: ghost,
-          alpha: 0,
-          duration: 70,
-          onComplete: () => ghost.destroy(),
-        });
-      });
-    }
-  }
-
   private endAttack(): void {
     this.isAttacking = false;
     const body = this.attackZone.body as Phaser.Physics.Arcade.Body;
     body.enable = false;
     this.slashGfx.clear();
     this.sprite.setScale(KNIGHT_SCALE);
+    this.sprite.angle = 0;
+    this.attackLungeX = 0;
+    this.attackLungeY = 0;
     this.sprite.play('knight-idle');
   }
 
@@ -406,7 +406,8 @@ export class Player extends Phaser.GameObjects.Container {
   }
 
   private updateSpritePosition(): void {
-    this.sprite.y = this.jumpOffset;
+    this.sprite.x = this.attackLungeX;
+    this.sprite.y = this.jumpOffset + this.attackLungeY;
 
     const jumpProgress = Math.abs(this.jumpOffset) / JUMP_HEIGHT;
     // More pronounced shadow — shrinks more and fades more during jump
@@ -416,8 +417,50 @@ export class Player extends Phaser.GameObjects.Container {
     this.directionIndicator.y = this.jumpOffset;
   }
 
-  private updateBob(_delta: number): void {
-    // Step bob removed — walk animation provides the movement feel.
+  private updateBob(delta: number): void {
+    const body = this.body as Phaser.Physics.Arcade.Body;
+    const moving = (body.velocity.x !== 0 || body.velocity.y !== 0) && !this.frozen;
+
+    if (moving && !this.isJumping) {
+      // Little hops + a slight lean — reads as footsteps without needing
+      // (broken) walk frames.
+      this.walkCycle += delta * 0.014 * this.speedMult;
+      this.sprite.y -= Math.abs(Math.sin(this.walkCycle)) * 2.4;
+      if (!this.isAttacking) {
+        this.sprite.angle = Math.sin(this.walkCycle) * 2.6;
+      }
+      this.stepDustTimer -= delta;
+      if (this.stepDustTimer <= 0) {
+        this.stepDustTimer = 250;
+        this.puffStepDust();
+      }
+    } else {
+      this.walkCycle = 0;
+      this.stepDustTimer = 0;
+      if (!this.isAttacking) this.sprite.angle = 0;
+    }
+  }
+
+  private puffStepDust(): void {
+    if (!this.scene.textures.exists('particle-soft')) return;
+    const p = this.scene.add.image(
+      this.x + Phaser.Math.Between(-5, 5),
+      this.y + 16,
+      'particle-soft',
+    );
+    p.setTint(0xc9bb98);
+    p.setAlpha(0.45);
+    p.setScale(0.5);
+    p.setDepth(this.depth - 0.2);
+    this.scene.tweens.add({
+      targets: p,
+      alpha: 0,
+      scale: 1.1,
+      y: p.y - 5,
+      duration: 340,
+      ease: 'Sine.easeOut',
+      onComplete: () => p.destroy(),
+    });
   }
 
   private updateInvincibility(delta: number): void {

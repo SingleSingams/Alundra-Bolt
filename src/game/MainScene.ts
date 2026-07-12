@@ -1204,8 +1204,20 @@ export class MainScene extends Phaser.Scene {
   private setupCamera(): void {
     this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
     this.cameras.main.startFollow(this.player, true, CAMERA_LERP, CAMERA_LERP);
-    this.cameras.main.setZoom(1.5);
+    this.cameras.main.setZoom(this.computeZoom());
+    this.scale.on(Phaser.Scale.Events.RESIZE, () => {
+      this.cameras.main.setZoom(this.computeZoom());
+    });
     this.atmosphere.applyCameraFX();
+  }
+
+  /**
+   * Desktop gets the cozy 1.5x close-up; small/flat screens (phones,
+   * especially landscape) zoom out so enough of the world stays visible.
+   */
+  private computeZoom(): number {
+    const minDim = Math.min(this.scale.width, this.scale.height);
+    return Phaser.Math.Clamp(minDim / 440, 0.85, 1.5);
   }
 
   private setupDepth(): void {
